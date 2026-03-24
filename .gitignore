@@ -11,6 +11,7 @@ gradle-wrapper.properties
 gradlew
 gradlew.bat
 settings.gradle.kts
+**.db
 
 ### IntelliJ IDEA ###
 .idea
