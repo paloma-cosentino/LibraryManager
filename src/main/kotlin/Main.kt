@@ -1,11 +1,12 @@
 package org.example
 
-import org.example.repository.InMemoryBookRepository
+import org.example.database.DatabaseFactory
+import org.example.repository.SQLiteBookRepository
 import org.example.service.BookService
 
 fun main() {
-    val service = BookService(InMemoryBookRepository())
-
+    val database = DatabaseFactory.init()
+    val service = BookService(SQLiteBookRepository(database))
     val book1 = service.addBook("Clean Code", "Robert C. Martin", "Programming", 3)
     val book2 = service.addBook("The Pragmatic Programmer", "David Thomas", "Programming", 5)
 
