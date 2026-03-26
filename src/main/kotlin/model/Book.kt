@@ -5,5 +5,7 @@ data class Book(
     val title: String,
     val author: Author,
     val category: BookCategory,
-    val quantity: Int
+    val quantity: Int,
+    val publishedYear: Int? = null,
+    val edition: String? = null,
 )

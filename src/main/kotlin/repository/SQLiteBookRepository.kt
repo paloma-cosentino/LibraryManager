@@ -18,7 +18,9 @@ class SQLiteBookRepository(private val database: Database): BookRepository {
             this[AuthorTable.name]
         ),
         category = BookCategory.entries.first { it.displayName == this[BookTable.category] },
-        quantity = this[BookTable.quantity]
+        quantity = this[BookTable.quantity],
+        publishedYear = this[BookTable.publishedYear],
+        edition = this[BookTable.edition]
     )
 
 
@@ -47,6 +49,8 @@ class SQLiteBookRepository(private val database: Database): BookRepository {
                 it[authorId] = book.author.id
                 it[category] = book.category.displayName
                 it[quantity] = book.quantity
+                it[publishedYear] = book.publishedYear
+                it[edition] = book.edition
             } get BookTable.id
         )
     }
@@ -57,6 +61,8 @@ class SQLiteBookRepository(private val database: Database): BookRepository {
             it[authorId] = book.author.id
             it[category] = book.category.displayName
             it[quantity] = book.quantity
+            it[publishedYear] = book.publishedYear
+            it[edition] = book.edition
         }
         if (updatedRows == 0)  null else book
     }

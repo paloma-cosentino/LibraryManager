@@ -8,6 +8,8 @@ object BookTable: Table("books") {
     val authorId = reference("author_id", AuthorTable.id)
     val category = varchar("category", 255)
     val quantity = integer("quantity")
+    val publishedYear = integer("published_year").nullable()
+    val edition = varchar("edition", 255).nullable()
 
     override val primaryKey = PrimaryKey(id)
 }

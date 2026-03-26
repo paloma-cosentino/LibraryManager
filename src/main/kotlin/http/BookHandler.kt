@@ -43,7 +43,9 @@ class BookHandler(private val service: BookService) {
                 title      = body.title,
                 authorName = body.author,
                 category   = body.category,
-                quantity   = body.quantity
+                quantity   = body.quantity,
+                publishedYear = body.publishedYear,
+                edition   = body.edition
             )
             bookLens(saved, Response(OK))
         } catch (e: Exceptions.AuthorNotFoundException) {
@@ -66,7 +68,9 @@ class BookHandler(private val service: BookService) {
                 title      = body.title,
                 authorName = body.author,
                 category   = body.category,
-                quantity   = body.quantity
+                quantity   = body.quantity,
+                publishedYear = body.publishedYear,
+                edition   = body.edition
             )
             if (updated == null) Response(NOT_FOUND)
             else bookLens(updated, Response(OK))

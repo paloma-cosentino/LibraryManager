@@ -17,19 +17,54 @@ class BookService(
     fun getBookById(id: Int): Book = bookRepository.findById(id)
         ?: throw Exceptions.BookNotFoundException(id)
 
-    fun addBook(title: String, authorName: String, category: String, quantity: Int): Book {
-        val author       = resolveAuthor(authorName)
+    fun addBook(
+        title: String,
+        authorName: String,
+        category: String,
+        quantity: Int,
+        publishedYear: Int? = null,
+        edition: String? = null
+    ): Book {
+        val author = resolveAuthor(authorName)
         val bookCategory = resolveCategory(category)
         if (bookRepository.findByTitleAndAuthor(title, author.id) != null) {
             throw Exceptions.DuplicateBookException(title, authorName)
         }
-        return bookRepository.save(Book(id = 0, title = title, author = author, category = bookCategory, quantity = quantity))
+        return bookRepository.save(
+            Book(
+                id = 0,
+                title = title,
+                author = author,
+                category = bookCategory,
+                quantity = quantity,
+                publishedYear = publishedYear,
+                edition = edition
+            )
+        )
     }
 
-    fun updateBook(id: Int, title: String, authorName: String, category: String, quantity: Int): Book? {
-        val author       = resolveAuthor(authorName)
+    fun updateBook(
+        id: Int,
+        title: String,
+        authorName: String,
+        category: String,
+        quantity: Int,
+        publishedYear: Int? = null,
+        edition: String? = null
+    ): Book? {
+        val author = resolveAuthor(authorName)
         val bookCategory = resolveCategory(category)
-        return bookRepository.update(Book(id = id, title = title, author = author, category = bookCategory, quantity = quantity))
+        return bookRepository.update(
+            Book(
+                id = id,
+                title = title,
+                author = author,
+                category = bookCategory,
+                quantity = quantity,
+                publishedYear = publishedYear,
+                edition = edition
+            )
+        )
     }
 
     fun removeBook(id: Int): Boolean = bookRepository.delete(id)
