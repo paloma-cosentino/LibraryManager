@@ -9,7 +9,7 @@ class BookService(private val repository: BookRepository) {
 
     fun getAllBooks(): List<Book> = repository.findAll()
 
-    fun getBookById(id: Int): Book? = repository.findById(id)
+    fun getBookById(id: Int): Book = repository.findById(id) ?: throw Exceptions.BookNotFoundException(id)
 
     fun addBook(title: String, author: String, category: String, quantity: Int): Book {
         val bookCategory = BookCategory.entries.firstOrNull { it.displayName == category }
