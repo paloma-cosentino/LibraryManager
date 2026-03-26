@@ -1,16 +1,18 @@
 package org.example.http
 
-import org.http4k.core.HttpHandler
 import org.example.model.Book
+import org.example.model.Exceptions
 import org.example.service.BookService
 import org.http4k.core.Body
+import org.http4k.core.HttpHandler
 import org.http4k.core.Response
+import org.http4k.core.Status.Companion.CONFLICT
 import org.http4k.core.Status.Companion.NOT_FOUND
 import org.http4k.core.Status.Companion.NO_CONTENT
+import org.http4k.core.Status.Companion.OK
 import org.http4k.format.Jackson.auto
 import org.http4k.lens.Path
 import org.http4k.lens.int
-import org.http4k.core.Status.Companion.OK
 
 class BookHandler(private val service: BookService) {
     private val bookLens  = Body.auto<Book>().toLens()
@@ -29,6 +31,7 @@ class BookHandler(private val service: BookService) {
 
     val create: HttpHandler = { request ->
         val body = bookLens(request)
+        try {
         val saved = service.addBook(
             title = body.title,
             author = body.author,
@@ -36,6 +39,9 @@ class BookHandler(private val service: BookService) {
             quantity = body.quantity
         )
         bookLens(saved, Response(OK))
+        } catch (e: Exceptions.DuplicateBookException) {
+            Response(CONFLICT).body(e.message ?: "Book already exists")
+        }
 
     }
     val update: HttpHandler = {request ->

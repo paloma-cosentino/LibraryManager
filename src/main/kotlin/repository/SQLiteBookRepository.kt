@@ -27,6 +27,13 @@ class SQLiteBookRepository(private val database: Database): BookRepository {
              .firstOrNull()
     }
 
+    override fun findByTitleAndAuthor(title: String, author: String): Book? = transaction(database) {
+        BookTable.selectAll()
+            .where { (BookTable.title eq title) and (BookTable.author eq author) }
+            .map { it.toBook() }
+            .firstOrNull()
+    }
+
     override fun save(book: Book): Book = transaction (database){
         book.copy(
             id = BookTable.insert {
