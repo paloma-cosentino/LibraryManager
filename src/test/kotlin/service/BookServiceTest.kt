@@ -1,7 +1,6 @@
 package org.example.service
 
 import org.example.model.Author
-import org.example.model.Book
 import org.example.model.BookCategory
 import org.example.model.Exceptions
 import org.example.repository.InMemoryAuthorRepository
@@ -120,7 +119,13 @@ class BookServiceTest {
     fun `updateBook changes book fields`() {
         val added = service.addBook("Clean Code", "Robert C. Martin", "Technology", 3)
 
-        val updated = service.updateBook(added.copy(title = "Clean Code 2nd Ed", quantity = 10))
+        val updated = service.updateBook(
+            id         = added.id,
+            title      = "Clean Code 2nd Ed",
+            authorName = added.author.name,
+            category   = added.category.displayName,
+            quantity   = 10
+        )
 
         assertNotNull(updated)
         assertEquals("Clean Code 2nd Ed", updated.title)
@@ -130,7 +135,13 @@ class BookServiceTest {
     @Test
     fun `updateBook persists changes so they are retrievable`() {
         val added = service.addBook("Clean Code", "Robert C. Martin", "Technology", 3)
-        service.updateBook(added.copy(quantity = 10))
+        service.updateBook(
+            id         = added.id,
+            title      = added.title,
+            authorName = added.author.name,
+            category   = added.category.displayName,
+            quantity   = 10
+        )
 
         val found = service.getBookById(added.id)
 
@@ -139,9 +150,7 @@ class BookServiceTest {
 
     @Test
     fun `updateBook returns null when book does not exist`() {
-        val nonExistent = Book(999, "Ghost Book", Author(0, "Nobody"), BookCategory.FICTION, 0)
-
-        assertNull(service.updateBook(nonExistent))
+        assertNull(service.updateBook(999, "Ghost Book", "Robert C. Martin", "Fiction", 0))
     }
 
     // ─── removeBook ───────────────────────────────────────────────────────────

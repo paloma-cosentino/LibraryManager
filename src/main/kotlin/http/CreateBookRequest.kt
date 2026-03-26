@@ -1,6 +1,6 @@
 package org.example.http
 
-data class CreateBookRequest(
+data class BookRequest(
     val title: String,
     val author: String,
     val category: String,

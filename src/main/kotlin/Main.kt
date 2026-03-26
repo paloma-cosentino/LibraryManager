@@ -2,9 +2,9 @@ package org.example
 
 import org.example.database.DatabaseFactory
 import org.example.http.AuthorHandler
-import org.example.http.AuthorRoutes
 import org.example.http.BookHandler
-import org.example.http.BookRoutes
+import org.example.http.authorRoutes
+import org.example.http.bookRoutes
 import org.example.repository.SQLiteAuthorRepository
 import org.example.repository.SQLiteBookRepository
 import org.example.service.AuthorService
@@ -18,15 +18,13 @@ fun main() {
     val authorRepository = SQLiteAuthorRepository(database)
     val authorService    = AuthorService(authorRepository)
     val authorHandler    = AuthorHandler(authorService)
-    val authorRoutes     = AuthorRoutes().authorRoutes(authorHandler)
 
     val bookService  = BookService(SQLiteBookRepository(database), authorRepository)
     val bookHandler  = BookHandler(bookService)
-    val bookRoutes   = BookRoutes().bookRoutes(bookHandler)
 
-    routes(bookRoutes, authorRoutes).asServer(Jetty(8080)).start()
+    routes(bookRoutes(bookHandler), authorRoutes(authorHandler))
+        .asServer(Jetty(8080))
+        .start()
 
     println("LibraryManager running on http://localhost:8080")
 }
-
-

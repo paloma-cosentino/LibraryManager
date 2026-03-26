@@ -33,7 +33,7 @@ class BookHandlerTest {
         }
         val service = BookService(InMemoryBookRepository(), authorRepository)
         val handler = BookHandler(service)
-        app = BookRoutes().bookRoutes(handler)
+        app = bookRoutes(handler)
     }
 
     // ─── helpers ─────────────────────────────────────────────────────────────
@@ -183,5 +183,3 @@ class BookHandlerTest {
         assertEquals(NOT_FOUND, response.status)
     }
 }
-
-
