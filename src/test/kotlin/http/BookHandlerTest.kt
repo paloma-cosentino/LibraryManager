@@ -1,7 +1,9 @@
 package org.example.http
 
+import org.example.model.Author
 import org.example.model.Book
 import org.example.model.BookCategory
+import org.example.repository.InMemoryAuthorRepository
 import org.example.repository.InMemoryBookRepository
 import org.example.service.BookService
 import org.http4k.core.Body
@@ -24,7 +26,12 @@ class BookHandlerTest {
 
     @BeforeTest
     fun setUp() {
-        val service = BookService(InMemoryBookRepository())
+        val authorRepository = InMemoryAuthorRepository().apply {
+            save(Author(name = "Frank Herbert"))
+            save(Author(name = "George Orwell"))
+            save(Author(name = "Nobody"))
+        }
+        val service = BookService(InMemoryBookRepository(), authorRepository)
         val handler = BookHandler(service)
         app = BookRoutes().bookRoutes(handler)
     }
@@ -92,7 +99,7 @@ class BookHandlerTest {
         assertEquals(OK, response.status)
         val book = bookLens(response)
         assertEquals("Duna", book.title)
-        assertEquals("Frank Herbert", book.author)
+        assertEquals("Frank Herbert", book.author.name)
         assertEquals(BookCategory.SCIENCE_FICTION, book.category)
         assertEquals(5, book.quantity)
     }

@@ -1,15 +1,15 @@
 package org.example.model
 
-object Exceptions{
+object Exceptions {
     class BookNotFoundException(id: Int) : IllegalArgumentException("Book with id [$id] not found")
-    class DuplicateBookException(title: String, author: String)
-        : IllegalArgumentException(
+    class DuplicateBookException(title: String, author: String) : IllegalArgumentException(
         "Book with title [$title] and [$author] already exists"
-        )
+    )
 
-    class InvalidCategoryException(value: String)
-        : IllegalArgumentException(
+    class InvalidCategoryException(value: String) : IllegalArgumentException(
         "Invalid category [$value]. Valid values: ${BookCategory.entries.map { it.displayName }}"
     )
 
+    class AuthorNotFoundException(author: String) : IllegalArgumentException("Author with name [$author] not found")
+    class DuplicateAuthorException(name: String) : IllegalArgumentException("Author [$name] already exists")
 }

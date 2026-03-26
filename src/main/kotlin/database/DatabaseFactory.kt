@@ -9,7 +9,7 @@ object DatabaseFactory {
         // Cria (ou abre) o arquivo library.db na raiz do projeto
         val database = Database.connect("jdbc:sqlite:library.db", driver = "org.sqlite.JDBC")
         transaction {
-            SchemaUtils.create(BookTable)  // Cria a tabela se não existir
+            SchemaUtils.create(AuthorTable, BookTable)  // Cria as tabelas se não existirem
         }
         return database
     }

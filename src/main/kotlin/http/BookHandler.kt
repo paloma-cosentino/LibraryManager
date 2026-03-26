@@ -18,9 +18,11 @@ import org.http4k.lens.Path
 import org.http4k.lens.int
 
 class BookHandler(private val service: BookService) {
-    private val bookLens  = Body.auto<Book>().toLens()
-    private val booksLens = Body.auto<List<Book>>().toLens()
-    private val idPath    = Path.int().of("id")
+    private val bookLens          = Body.auto<Book>().toLens()
+    private val booksLens         = Body.auto<List<Book>>().toLens()
+    private val createRequestLens = Body.auto<CreateBookRequest>().toLens()
+    private val updateRequestLens = Body.auto<UpdateBookRequest>().toLens()
+    private val idPath            = Path.int().of("id")
 
     val getAll: HttpHandler = {
         booksLens(service.getAllBooks(), Response(OK))
@@ -37,14 +39,16 @@ class BookHandler(private val service: BookService) {
 
     val create: HttpHandler = { request ->
         try {
-        val body = bookLens(request)
+        val body = createRequestLens(request)
         val saved = service.addBook(
-            title = body.title,
-            author = body.author,
-            category = body.category.displayName,
-            quantity = body.quantity
+            title      = body.title,
+            authorName = body.author,
+            category   = body.category,
+            quantity   = body.quantity
         )
         bookLens(saved, Response(OK))
+        } catch (e: Exceptions.AuthorNotFoundException) {
+            Response(NOT_FOUND).body(e.message ?: "Author not found")
         } catch (e: Exceptions.DuplicateBookException) {
             Response(CONFLICT).body(e.message ?: "Book already exists")
         } catch (e: Exceptions.InvalidCategoryException) {
@@ -56,10 +60,23 @@ class BookHandler(private val service: BookService) {
         }
 
     }
-    val update: HttpHandler = {request ->
-        val update = service.updateBook(bookLens(request).copy(id = idPath(request)))
-        if (update == null) Response(NOT_FOUND)
-        else bookLens(update, Response(OK))
+    val update: HttpHandler = { request ->
+        try {
+            val body    = updateRequestLens(request)
+            val updated = service.updateBook(
+                id         = idPath(request),
+                title      = body.title,
+                authorName = body.author,
+                category   = body.category,
+                quantity   = body.quantity
+            )
+            if (updated == null) Response(NOT_FOUND)
+            else bookLens(updated, Response(OK))
+        } catch (e: Exceptions.AuthorNotFoundException) {
+            Response(NOT_FOUND).body(e.message ?: "Author not found")
+        } catch (e: Exceptions.InvalidCategoryException) {
+            Response(BAD_REQUEST).body(e.message ?: "Invalid category")
+        }
     }
 
     val delete: HttpHandler = {request ->

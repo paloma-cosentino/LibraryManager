@@ -8,8 +8,8 @@ class InMemoryBookRepository : BookRepository {
 
     override fun findAll(): List<Book> = books.values.toList()
     override fun findById(id: Int): Book? = books[id]
-    override fun findByTitleAndAuthor(title: String, author: String): Book? =
-        books.values.firstOrNull { it.title == title && it.author == author }
+    override fun findByTitleAndAuthor(title: String, authorId: Int): Book? =
+        books.values.firstOrNull { it.title == title && it.author.id == authorId }
 
     override fun save(book: Book): Book {
         val newBook = book.copy(id = nextId++)

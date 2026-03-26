@@ -1,6 +1,8 @@
 package org.example.repository
 
+import org.example.database.AuthorTable
 import org.example.database.BookTable
+import org.example.model.Author
 import org.example.model.Book
 import org.example.model.BookCategory
 import org.jetbrains.exposed.sql.*
@@ -11,26 +13,29 @@ class SQLiteBookRepository(private val database: Database): BookRepository {
     private fun ResultRow.toBook() = Book(
         id = this[BookTable.id],
         title = this[BookTable.title],
-        author = this[BookTable.author],
+        author = Author(
+            this[AuthorTable.id],
+            this[AuthorTable.name]
+        ),
         category = BookCategory.entries.first { it.displayName == this[BookTable.category] },
         quantity = this[BookTable.quantity]
     )
 
 
     override fun findAll(): List<Book>  = transaction(database) {
-       BookTable.selectAll().map { it.toBook() }
+       (BookTable innerJoin AuthorTable).selectAll().map { it.toBook() }
     }
 
     override fun findById(id: Int): Book? = transaction(database) {
-         BookTable.selectAll()
+        (BookTable innerJoin AuthorTable).selectAll()
              .where {BookTable.id eq id}
              .map {it.toBook()}
              .firstOrNull()
     }
 
-    override fun findByTitleAndAuthor(title: String, author: String): Book? = transaction(database) {
-        BookTable.selectAll()
-            .where { (BookTable.title eq title) and (BookTable.author eq author) }
+    override fun findByTitleAndAuthor(title: String, authorId: Int): Book? = transaction(database) {
+        (BookTable innerJoin AuthorTable).selectAll()
+            .where { (BookTable.title eq title) and (BookTable.authorId eq authorId) }
             .map { it.toBook() }
             .firstOrNull()
     }
@@ -39,7 +44,7 @@ class SQLiteBookRepository(private val database: Database): BookRepository {
         book.copy(
             id = BookTable.insert {
                 it[title] = book.title
-                it[author] = book.author
+                it[authorId] = book.author.id
                 it[category] = book.category.displayName
                 it[quantity] = book.quantity
             } get BookTable.id
@@ -49,7 +54,7 @@ class SQLiteBookRepository(private val database: Database): BookRepository {
     override fun update(book: Book): Book? = transaction (database){
         val updatedRows = BookTable.update({ BookTable.id eq book.id }) {
             it[title] = book.title
-            it[author] = book.author
+            it[authorId] = book.author.id
             it[category] = book.category.displayName
             it[quantity] = book.quantity
         }

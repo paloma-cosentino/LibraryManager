@@ -1,18 +1,26 @@
 package org.example.service
 
+import org.example.model.Author
 import org.example.model.Book
 import org.example.model.BookCategory
 import org.example.model.Exceptions
+import org.example.repository.InMemoryAuthorRepository
 import org.example.repository.InMemoryBookRepository
 import kotlin.test.*
 
 class BookServiceTest {
 
     private lateinit var service: BookService
+    private lateinit var authorRepository: InMemoryAuthorRepository
 
     @BeforeTest
     fun setUp() {
-        service = BookService(InMemoryBookRepository())
+        authorRepository = InMemoryAuthorRepository()
+        authorRepository.save(Author(name = "Robert C. Martin"))
+        authorRepository.save(Author(name = "David Thomas"))
+        authorRepository.save(Author(name = "Stephen King"))
+        authorRepository.save(Author(name = "Another Author"))
+        service = BookService(InMemoryBookRepository(), authorRepository)
     }
 
     // ─── getAllBooks ──────────────────────────────────────────────────────────
@@ -62,7 +70,7 @@ class BookServiceTest {
         val book = service.addBook("Clean Code", "Robert C. Martin", "Technology", 3)
 
         assertEquals("Clean Code", book.title)
-        assertEquals("Robert C. Martin", book.author)
+        assertEquals("Robert C. Martin", book.author.name)
         assertEquals(BookCategory.TECHNOLOGY, book.category)
         assertEquals(3, book.quantity)
     }
@@ -131,7 +139,7 @@ class BookServiceTest {
 
     @Test
     fun `updateBook returns null when book does not exist`() {
-        val nonExistent = Book(999, "Ghost Book", "Nobody", BookCategory.FICTION, 0)
+        val nonExistent = Book(999, "Ghost Book", Author(0, "Nobody"), BookCategory.FICTION, 0)
 
         assertNull(service.updateBook(nonExistent))
     }
