@@ -50,7 +50,7 @@ class BookHandler(private val service: BookService) {
         } catch (e: Exceptions.InvalidCategoryException) {
             Response(BAD_REQUEST).body(e.message ?: "Invalid category")
         } catch (e: LensFailure) {
-            Response(BAD_REQUEST).body(
+            Response(BAD_REQUEST).body( e.message ?:
                 "Invalid category. Valid values: ${BookCategory.entries.map { it.displayName }}"
             )
         }
