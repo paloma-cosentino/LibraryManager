@@ -1,6 +1,5 @@
 package org.example.service
 
-import org.example.model.Author
 import org.example.model.BookCategory
 import org.example.model.Exceptions
 import org.example.repository.InMemoryAuthorRepository
@@ -15,10 +14,6 @@ class BookServiceTest {
     @BeforeTest
     fun setUp() {
         authorRepository = InMemoryAuthorRepository()
-        authorRepository.save(Author(name = "Robert C. Martin"))
-        authorRepository.save(Author(name = "David Thomas"))
-        authorRepository.save(Author(name = "Stephen King"))
-        authorRepository.save(Author(name = "Another Author"))
         service = BookService(InMemoryBookRepository(), authorRepository)
     }
 
@@ -113,6 +108,31 @@ class BookServiceTest {
         }
     }
 
+    @Test
+    fun `addBook creates author automatically when author does not exist`() {
+        val book = service.addBook("Duna", "Frank Herbert", "Science Fiction", 4)
+
+        assertEquals("Frank Herbert", book.author.name)
+        assertTrue(book.author.id > 0)
+    }
+
+    @Test
+    fun `addBook persists new author in repository when author does not exist`() {
+        service.addBook("Duna", "Frank Herbert", "Science Fiction", 4)
+
+        assertNotNull(authorRepository.findByName("Frank Herbert"))
+    }
+
+    @Test
+    fun `addBook reuses existing author and does not create duplicate`() {
+        service.addBook("Duna", "Frank Herbert", "Science Fiction", 4)
+        service.addBook("It", "Frank Herbert", "Horror", 2)
+
+        val allAuthors = authorRepository.findAll().filter { it.name == "Frank Herbert" }
+        assertEquals(1, allAuthors.size)
+    }
+
+
     // ─── updateBook ───────────────────────────────────────────────────────────
 
     @Test
@@ -151,6 +171,23 @@ class BookServiceTest {
     @Test
     fun `updateBook returns null when book does not exist`() {
         assertNull(service.updateBook(999, "Ghost Book", "Robert C. Martin", "Fiction", 0))
+    }
+
+    @Test
+    fun `updateBook creates author automatically when new author does not exist`() {
+        val added = service.addBook("Clean Code", "Robert C. Martin", "Technology", 3)
+
+        val updated = service.updateBook(
+            id         = added.id,
+            title      = added.title,
+            authorName = "New Unknown Author",
+            category   = added.category.displayName,
+            quantity   = added.quantity
+        )
+
+        assertNotNull(updated)
+        assertEquals("New Unknown Author", updated.author.name)
+        assertNotNull(authorRepository.findByName("New Unknown Author"))
     }
 
     // ─── removeBook ───────────────────────────────────────────────────────────

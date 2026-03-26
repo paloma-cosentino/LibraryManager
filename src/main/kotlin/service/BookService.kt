@@ -1,5 +1,6 @@
 package org.example.service
 
+import org.example.model.Author
 import org.example.model.Book
 import org.example.model.BookCategory
 import org.example.model.Exceptions
@@ -35,7 +36,7 @@ class BookService(
 
     private fun resolveAuthor(authorName: String) =
         authorRepository.findByName(authorName)
-            ?: throw Exceptions.AuthorNotFoundException(authorName)
+            ?: authorRepository.save(Author(name = authorName))
 
     private fun resolveCategory(category: String) =
         BookCategory.entries.firstOrNull { it.displayName == category }
