@@ -6,6 +6,7 @@ import org.example.service.BookService
 import org.http4k.core.Body
 import org.http4k.core.HttpHandler
 import org.http4k.core.Response
+import org.http4k.core.Status.Companion.BAD_REQUEST
 import org.http4k.core.Status.Companion.CONFLICT
 import org.http4k.core.Status.Companion.NOT_FOUND
 import org.http4k.core.Status.Companion.NO_CONTENT
@@ -35,12 +36,14 @@ class BookHandler(private val service: BookService) {
         val saved = service.addBook(
             title = body.title,
             author = body.author,
-            category = body.category,
+            category = body.category.displayName,
             quantity = body.quantity
         )
         bookLens(saved, Response(OK))
         } catch (e: Exceptions.DuplicateBookException) {
             Response(CONFLICT).body(e.message ?: "Book already exists")
+        } catch (e: Exceptions.InvalidCategoryException) {
+            Response(BAD_REQUEST).body(e.message ?: "Invalid category")
         }
 
     }

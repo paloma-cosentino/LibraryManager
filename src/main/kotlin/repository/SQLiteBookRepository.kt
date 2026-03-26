@@ -2,6 +2,7 @@ package org.example.repository
 
 import org.example.database.BookTable
 import org.example.model.Book
+import org.example.model.BookCategory
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -11,7 +12,7 @@ class SQLiteBookRepository(private val database: Database): BookRepository {
         id = this[BookTable.id],
         title = this[BookTable.title],
         author = this[BookTable.author],
-        category = this[BookTable.category],
+        category = BookCategory.entries.first { it.displayName == this[BookTable.category] },
         quantity = this[BookTable.quantity]
     )
 
@@ -39,7 +40,7 @@ class SQLiteBookRepository(private val database: Database): BookRepository {
             id = BookTable.insert {
                 it[title] = book.title
                 it[author] = book.author
-                it[category] = book.category
+                it[category] = book.category.displayName
                 it[quantity] = book.quantity
             } get BookTable.id
         )
@@ -49,7 +50,7 @@ class SQLiteBookRepository(private val database: Database): BookRepository {
         val updatedRows = BookTable.update({ BookTable.id eq book.id }) {
             it[title] = book.title
             it[author] = book.author
-            it[category] = book.category
+            it[category] = book.category.displayName
             it[quantity] = book.quantity
         }
         if (updatedRows == 0)  null else book
