@@ -13,7 +13,7 @@ gradlew.bat
 settings.gradle.kts
 **.db
 TODOLIST.md
-!src/**.md
+FILTROSPAGINACAO.md
 
 ### IntelliJ IDEA ###
 .idea
