@@ -1,6 +1,7 @@
 package org.example.service
 
 import org.example.model.BookCategory
+import org.example.model.BookFilter
 import org.example.model.Exceptions
 import org.example.repository.InMemoryAuthorRepository
 import org.example.repository.InMemoryBookRepository
@@ -21,7 +22,7 @@ class BookServiceTest {
 
     @Test
     fun `getAllBooks returns empty list when no books exist`() {
-        assertTrue(service.getAllBooks().isEmpty())
+        assertTrue(service.getAllBooks(filter = BookFilter()).data.isEmpty())
     }
 
     @Test
@@ -29,7 +30,7 @@ class BookServiceTest {
         service.addBook("Clean Code", "Robert C. Martin", "Technology", 3)
         service.addBook("The Pragmatic Programmer", "David Thomas", "Technology", 5)
 
-        assertEquals(2, service.getAllBooks().size)
+        assertEquals(2, service.getAllBooks(BookFilter()).data.size)
     }
 
     // ─── getBookById ──────────────────────────────────────────────────────────
