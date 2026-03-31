@@ -3,7 +3,9 @@ package org.example.service
 import org.example.model.Author
 import org.example.model.Book
 import org.example.model.BookCategory
+import org.example.model.BookFilter
 import org.example.model.Exceptions
+import org.example.model.PagedResult
 import org.example.repository.AuthorRepository
 import org.example.repository.BookRepository
 
@@ -11,8 +13,8 @@ class BookService(
     private val bookRepository: BookRepository,
     private val authorRepository: AuthorRepository
 ) {
-
-    fun getAllBooks(): List<Book> = bookRepository.findAll()
+    fun getAllBooks(filter: BookFilter): PagedResult<Book> =
+        bookRepository.findAll(filter)
 
     fun getBookById(id: Int): Book = bookRepository.findById(id)
         ?: throw Exceptions.BookNotFoundException(id)

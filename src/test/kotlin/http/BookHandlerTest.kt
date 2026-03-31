@@ -3,6 +3,7 @@ package org.example.http
 import org.example.model.Author
 import org.example.model.Book
 import org.example.model.BookCategory
+import org.example.model.PagedResult
 import org.example.repository.InMemoryAuthorRepository
 import org.example.repository.InMemoryBookRepository
 import org.example.service.BookService
@@ -21,8 +22,8 @@ import kotlin.test.*
 class BookHandlerTest {
 
     private lateinit var app: HttpHandler
-    private val bookLens  = Body.auto<Book>().toLens()
-    private val booksLens = Body.auto<List<Book>>().toLens()
+    private val bookLens       = Body.auto<Book>().toLens()
+    private val pagedBooksLens = Body.auto<PagedResult<Book>>().toLens()
 
     @BeforeTest
     fun setUp() {
@@ -56,7 +57,7 @@ class BookHandlerTest {
         val response = app(Request(GET, "/books"))
 
         assertEquals(OK, response.status)
-        assertTrue(booksLens(response).isEmpty())
+        assertTrue(pagedBooksLens(response).data.isEmpty())
     }
 
     @Test
@@ -67,7 +68,7 @@ class BookHandlerTest {
         val response = app(Request(GET, "/books"))
 
         assertEquals(OK, response.status)
-        assertEquals(2, booksLens(response).size)
+        assertEquals(2, pagedBooksLens(response).data.size)
     }
 
     // ─── GET /books/{id} ──────────────────────────────────────────────────────

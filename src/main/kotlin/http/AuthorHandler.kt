@@ -1,7 +1,9 @@
 package org.example.http
 
 import org.example.model.Author
+import org.example.model.AuthorFilter
 import org.example.model.Exceptions
+import org.example.model.PagedResult
 import org.example.service.AuthorService
 import org.http4k.core.Body
 import org.http4k.core.HttpHandler
@@ -12,6 +14,7 @@ import org.http4k.core.Status.Companion.NO_CONTENT
 import org.http4k.core.Status.Companion.OK
 import org.http4k.format.Jackson.auto
 import org.http4k.lens.Path
+import org.http4k.lens.Query
 import org.http4k.lens.int
 
 class AuthorHandler(private val service: AuthorService) {
@@ -19,8 +22,19 @@ class AuthorHandler(private val service: AuthorService) {
     private val authorsLens = Body.auto<List<Author>>().toLens()
     private val idPath      = Path.int().of("id")
 
-    val getAll: HttpHandler = {
-        authorsLens(service.getAllAuthors(), Response(OK))
+    private val nameQuery  = Query.optional("name")
+    private val pageQuery  = Query.int().defaulted("page", 1)
+    private val sizeQuery  = Query.int().defaulted("size", 10)
+
+    private val pagedAuthorsLens = Body.auto<PagedResult<Author>>().toLens()
+
+    val getAll: HttpHandler = { request ->
+        val filter = AuthorFilter(
+            name = nameQuery(request),
+            page = pageQuery(request).coerceAtLeast(1),
+            size = sizeQuery(request).coerceIn(1, 100)
+        )
+        pagedAuthorsLens(service.getAllAuthors(filter), Response(OK))
     }
 
     val getById: HttpHandler = { request ->
