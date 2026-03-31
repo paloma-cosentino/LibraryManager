@@ -2,7 +2,8 @@ package org.example.service
 
 import org.example.model.BookCategory
 import org.example.model.BookFilter
-import org.example.model.Exceptions
+import org.example.model.BookExceptions
+import org.example.model.AuthorFilter
 import org.example.repository.InMemoryAuthorRepository
 import org.example.repository.InMemoryBookRepository
 import kotlin.test.*
@@ -46,7 +47,7 @@ class BookServiceTest {
 
     @Test
     fun `getBookById throws BookNotFoundException when book does not exist`() {
-        assertFailsWith<Exceptions.BookNotFoundException> {
+        assertFailsWith<BookExceptions.BookNotFoundException> {
             service.getBookById(999)
         }
     }
@@ -89,7 +90,7 @@ class BookServiceTest {
     fun `addBook throws DuplicateBookException when same title and author already exist`() {
         service.addBook("Clean Code", "Robert C. Martin", "Technology", 3)
 
-        assertFailsWith<Exceptions.DuplicateBookException> {
+        assertFailsWith<BookExceptions.DuplicateBookException> {
             service.addBook("Clean Code", "Robert C. Martin", "Technology", 1)
         }
     }
@@ -104,7 +105,7 @@ class BookServiceTest {
 
     @Test
     fun `addBook throws InvalidCategoryException when category is not valid`() {
-        assertFailsWith<Exceptions.InvalidCategoryException> {
+        assertFailsWith<BookExceptions.InvalidCategoryException> {
             service.addBook("Clean Code", "Robert C. Martin", "Programming", 3)
         }
     }
@@ -129,7 +130,7 @@ class BookServiceTest {
         service.addBook("Duna", "Frank Herbert", "Science Fiction", 4)
         service.addBook("It", "Frank Herbert", "Horror", 2)
 
-        val allAuthors = authorRepository.findAll().filter { it.name == "Frank Herbert" }
+        val allAuthors = authorRepository.findAll(AuthorFilter()).data.filter { it.name == "Frank Herbert" }
         assertEquals(1, allAuthors.size)
     }
 
@@ -200,7 +201,7 @@ class BookServiceTest {
         val result = service.removeBook(added.id)
 
         assertTrue(result)
-        assertFailsWith<Exceptions.BookNotFoundException> {
+        assertFailsWith<BookExceptions.BookNotFoundException> {
             service.getBookById(added.id)
         }
     }
@@ -217,7 +218,7 @@ class BookServiceTest {
 
         service.removeBook(book1.id)
 
-        assertFailsWith<Exceptions.BookNotFoundException> { service.getBookById(book1.id) }
+        assertFailsWith<BookExceptions.BookNotFoundException> { service.getBookById(book1.id) }
         assertNotNull(service.getBookById(book2.id))
     }
 }

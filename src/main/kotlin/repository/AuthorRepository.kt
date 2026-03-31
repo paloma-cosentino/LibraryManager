@@ -5,7 +5,6 @@ import org.example.model.AuthorFilter
 import org.example.model.PagedResult
 
 interface AuthorRepository {
-    fun findAll(): List<Author>
     fun findAll(filter: AuthorFilter): PagedResult<Author>
     fun findById(id: Int): Author?
     fun findByName(name: String): Author?

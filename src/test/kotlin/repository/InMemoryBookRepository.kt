@@ -9,7 +9,6 @@ class InMemoryBookRepository : BookRepository {
     private val books = mutableMapOf<Int, Book>()
     private var nextId: Int = 1
 
-    override fun findAll(): List<Book> = books.values.toList()
 
     override fun findAll(filter: BookFilter): PagedResult<Book> {
         var result = books.values.toList()

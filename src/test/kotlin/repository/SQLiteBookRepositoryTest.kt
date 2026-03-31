@@ -5,6 +5,7 @@ import org.example.database.BookTable
 import org.example.model.Author
 import org.example.model.Book
 import org.example.model.BookCategory
+import org.example.model.BookFilter
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.insert
@@ -41,7 +42,7 @@ class SQLiteBookRepositoryTest {
 
     @Test
     fun `findAll returns empty list when no books exist`() {
-        assertTrue(repository.findAll().isEmpty())
+        assertTrue(repository.findAll(BookFilter()).data.isEmpty())
     }
 
     @Test
@@ -51,7 +52,7 @@ class SQLiteBookRepositoryTest {
         repository.save(Book(0, "Clean Code", robert, BookCategory.TECHNOLOGY, 3))
         repository.save(Book(0, "The Pragmatic Programmer", david, BookCategory.TECHNOLOGY, 5))
 
-        assertEquals(2, repository.findAll().size)
+        assertEquals(2, repository.findAll(BookFilter()).data.size)
     }
 
     // ─── save ────────────────────────────────────────────────────────────────
@@ -90,7 +91,7 @@ class SQLiteBookRepositoryTest {
         val author = insertAuthor("Frank Herbert")
         repository.save(Book(0, "Duna", author, BookCategory.SCIENCE_FICTION, 5))
 
-        val found = repository.findAll().first()
+        val found: Book = repository.findAll(BookFilter()).data.first()
 
         assertEquals(BookCategory.SCIENCE_FICTION, found.category)
     }

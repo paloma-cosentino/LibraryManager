@@ -27,10 +27,6 @@ class SQLiteBookRepository(private val database: Database): BookRepository {
     )
 
 
-    override fun findAll(): List<Book>  = transaction(database) {
-       (BookTable innerJoin AuthorTable).selectAll().map { it.toBook() }
-    }
-
     override fun findAll(filter: BookFilter): PagedResult<Book> = transaction(database) {
         var query = (BookTable innerJoin AuthorTable).selectAll()
 

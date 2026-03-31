@@ -2,13 +2,11 @@ package org.example.http
 
 import org.example.model.Author
 import org.example.model.AuthorFilter
-import org.example.model.Exceptions
 import org.example.model.PagedResult
-import org.example.service.AuthorService
+import org.example.service.IAuthorService
 import org.http4k.core.Body
 import org.http4k.core.HttpHandler
 import org.http4k.core.Response
-import org.http4k.core.Status.Companion.CONFLICT
 import org.http4k.core.Status.Companion.NOT_FOUND
 import org.http4k.core.Status.Companion.NO_CONTENT
 import org.http4k.core.Status.Companion.OK
@@ -17,10 +15,9 @@ import org.http4k.lens.Path
 import org.http4k.lens.Query
 import org.http4k.lens.int
 
-class AuthorHandler(private val service: AuthorService) {
-    private val authorLens  = Body.auto<Author>().toLens()
-    private val authorsLens = Body.auto<List<Author>>().toLens()
-    private val idPath      = Path.int().of("id")
+class AuthorHandler(private val service: IAuthorService){
+    private val authorLens = Body.auto<Author>().toLens()
+    private val idPath     = Path.int().of("id")
 
     private val nameQuery  = Query.optional("name")
     private val pageQuery  = Query.int().defaulted("page", 1)
@@ -38,21 +35,15 @@ class AuthorHandler(private val service: AuthorService) {
     }
 
     val getById: HttpHandler = { request ->
-        try {
-            val author = service.getAuthorById(idPath(request))
-            authorLens(author, Response(OK))
-        } catch (e: Exceptions.AuthorNotFoundException) {
-            Response(NOT_FOUND).body(e.message ?: "Author not found")
+        handleAuthorExceptions {
+            authorLens(service.getAuthorById(idPath(request)), Response(OK))
         }
     }
 
     val create: HttpHandler = { request ->
-        try {
-            val body = authorLens(request)
-            val saved = service.addAuthor(name = body.name)
+        handleAuthorExceptions {
+            val saved = service.addAuthor(name = authorLens(request).name)
             authorLens(saved, Response(OK))
-        } catch (e: Exceptions.DuplicateAuthorException) {
-            Response(CONFLICT).body(e.message ?: "Author already exists")
         }
     }
 

@@ -4,7 +4,7 @@ import org.example.model.Author
 import org.example.model.Book
 import org.example.model.BookCategory
 import org.example.model.BookFilter
-import org.example.model.Exceptions
+import org.example.model.BookExceptions
 import org.example.model.PagedResult
 import org.example.repository.AuthorRepository
 import org.example.repository.BookRepository
@@ -12,25 +12,25 @@ import org.example.repository.BookRepository
 class BookService(
     private val bookRepository: BookRepository,
     private val authorRepository: AuthorRepository
-) {
-    fun getAllBooks(filter: BookFilter): PagedResult<Book> =
+): IBookService {
+    override fun getAllBooks(filter: BookFilter): PagedResult<Book> =
         bookRepository.findAll(filter)
 
-    fun getBookById(id: Int): Book = bookRepository.findById(id)
-        ?: throw Exceptions.BookNotFoundException(id)
+    override fun getBookById(id: Int): Book = bookRepository.findById(id)
+        ?: throw BookExceptions.BookNotFoundException(id)
 
-    fun addBook(
+    override fun addBook(
         title: String,
         authorName: String,
         category: String,
         quantity: Int,
-        publishedYear: Int? = null,
-        edition: String? = null
+        publishedYear: Int?,
+        edition: String?
     ): Book {
         val author = resolveAuthor(authorName)
         val bookCategory = resolveCategory(category)
         if (bookRepository.findByTitleAndAuthor(title, author.id) != null) {
-            throw Exceptions.DuplicateBookException(title, authorName)
+            throw BookExceptions.DuplicateBookException(title, authorName)
         }
         return bookRepository.save(
             Book(
@@ -45,14 +45,14 @@ class BookService(
         )
     }
 
-    fun updateBook(
+    override fun updateBook(
         id: Int,
         title: String,
         authorName: String,
         category: String,
         quantity: Int,
-        publishedYear: Int? = null,
-        edition: String? = null
+        publishedYear: Int?,
+        edition: String?
     ): Book? {
         val author = resolveAuthor(authorName)
         val bookCategory = resolveCategory(category)
@@ -69,7 +69,7 @@ class BookService(
         )
     }
 
-    fun removeBook(id: Int): Boolean = bookRepository.delete(id)
+    override fun removeBook(id: Int): Boolean = bookRepository.delete(id)
 
     private fun resolveAuthor(authorName: String) =
         authorRepository.findByName(authorName)
@@ -77,5 +77,5 @@ class BookService(
 
     private fun resolveCategory(category: String) =
         BookCategory.entries.firstOrNull { it.displayName == category }
-            ?: throw Exceptions.InvalidCategoryException(category)
+            ?: throw BookExceptions.InvalidCategoryException(category)
 }

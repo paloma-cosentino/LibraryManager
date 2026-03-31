@@ -16,9 +16,7 @@ class SQLiteAuthorRepository(private val database: Database) : AuthorRepository 
         name = this[AuthorTable.name]
     )
 
-    override fun findAll(): List<Author> = transaction(database) {
-        AuthorTable.selectAll().map { it.toAuthor() }
-    }
+
 
     override fun findAll(filter: AuthorFilter): PagedResult<Author> = transaction(database) {
         var query = AuthorTable.selectAll()
