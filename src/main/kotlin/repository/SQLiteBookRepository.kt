@@ -72,7 +72,7 @@ class SQLiteBookRepository(private val database: Database): BookRepository {
                 it[quantity] = book.quantity
                 it[publishedYear] = book.publishedYear
                 it[edition] = book.edition
-            } get BookTable.id
+            }[BookTable.id]
         )
     }
 
