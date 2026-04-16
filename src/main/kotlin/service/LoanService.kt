@@ -42,7 +42,9 @@ class LoanService(
         if (loan.isReturned)
             throw LoanExceptions.LoanAlreadyReturnedException(loanId)
 
-        bookRepository.update(loan.book.copy(quantity = loan.book.quantity + 1))
+        val currentBook = bookRepository.findById(loan.book.id)
+            ?: throw BookExceptions.BookNotFoundException(loan.book.id)
+        bookRepository.update(currentBook.copy(quantity = currentBook.quantity + 1))
 
         return loanRepository.update(loan.copy(returnedAt = LocalDate.now()))
 
