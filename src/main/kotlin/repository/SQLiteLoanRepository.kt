@@ -78,15 +78,15 @@ class SQLiteLoanRepository(private val database: Database) : LoanRepository{
         )
     }
 
-    override fun update(loan: Loan): Loan? = transaction(database) {
-        val updatedLoan = LoanTable.update({ LoanTable.id eq loan.id }) {
+    override fun update(loan: Loan): Loan = transaction(database) {
+        LoanTable.update({ LoanTable.id eq loan.id }) {
             it[bookId] = loan.book.id
             it[borrowerName] = loan.borrowerName
             it[borrowedAt] = loan.borrowedAt.toString()
             it[dueDate] = loan.dueDate.toString()
             it[returnedAt] = loan.returnedAt?.toString()
         }
-        if (updatedLoan == 0) null else loan
+        loan
     }
 
 }

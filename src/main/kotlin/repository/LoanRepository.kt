@@ -8,5 +8,5 @@ interface LoanRepository {
     fun findAll(filter: LoanFilter): PagedResult<Loan>
     fun findById(id: Int): Loan?
     fun save(loan: Loan): Loan
-    fun update(loan: Loan): Loan?   // usado só para registrar a devolução
+    fun update(loan: Loan): Loan   // usado só para registrar a devolução
 }
