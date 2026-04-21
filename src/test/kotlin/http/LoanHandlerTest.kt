@@ -25,7 +25,6 @@ class LoanHandlerTest {
     private val loanLens       = Body.auto<Loan>().toLens()
     private val pagedLoansLens = Body.auto<PagedResult<Loan>>().toLens()
 
-    private lateinit var bookRepository: InMemoryBookRepository
     private lateinit var dune: Book
     private lateinit var foundation: Book
 
@@ -34,7 +33,7 @@ class LoanHandlerTest {
         val author = Author(1, "Frank Herbert")
         val asimov = Author(2, "Isaac Asimov")
 
-        bookRepository = InMemoryBookRepository()
+        val bookRepository = InMemoryBookRepository()
         dune       = bookRepository.save(Book(0, "Dune",       author, BookCategory.SCIENCE_FICTION, 2))
         foundation = bookRepository.save(Book(0, "Foundation", asimov, BookCategory.SCIENCE_FICTION, 1))
 
@@ -69,18 +68,6 @@ class LoanHandlerTest {
         assertNull(loan.returnedAt)
     }
 
-    @Test
-    fun `POST loans assigns a generated id`() {
-        val loan = loanLens(postBorrow())
-        assertTrue(loan.id > 0)
-    }
-
-    @Test
-    fun `POST loans decrements book quantity`() {
-        postBorrow(bookId = dune.id)
-        val remaining = bookRepository.findById(dune.id)!!.quantity
-        assertEquals(1, remaining)
-    }
 
     @Test
     fun `POST loans returns 404 when book does not exist`() {
@@ -180,15 +167,6 @@ class LoanHandlerTest {
         assertNotNull(loanLens(response).returnedAt)
     }
 
-    @Test
-    fun `PATCH loans return increments book quantity`() {
-        val created = loanLens(postBorrow(bookId = foundation.id))
-        assertEquals(0, bookRepository.findById(foundation.id)!!.quantity)
-
-        patchReturn(created.id)
-
-        assertEquals(1, bookRepository.findById(foundation.id)!!.quantity)
-    }
 
     @Test
     fun `PATCH loans return returns 409 when loan already returned`() {

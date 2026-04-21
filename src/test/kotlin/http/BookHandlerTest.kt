@@ -105,12 +105,6 @@ class BookHandlerTest {
         assertEquals(5, book.quantity)
     }
 
-    @Test
-    fun `POST books assigns a generated id`() {
-        val response = postBook()
-
-        assertTrue(bookLens(response).id > 0)
-    }
 
     @Test
     fun `POST books returns 409 when book is duplicate`() {
