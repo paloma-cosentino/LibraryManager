@@ -104,7 +104,7 @@ class SQLiteLoanRepositoryTest {
 
     @Test
     fun `findAll returns empty when no loans exist`() {
-        assertTrue(repository.findAll(LoanFilter()).data.isEmpty())
+        assertTrue(repository.findAll(LoanFilter(borrowerName = null, bookId = null, onlyActive = false)).data.isEmpty())
     }
 
     @Test
@@ -114,7 +114,7 @@ class SQLiteLoanRepositoryTest {
         insertLoan(book, borrower = "Alice")
         insertLoan(book, borrower = "Bob")
 
-        assertEquals(2, repository.findAll(LoanFilter()).data.size)
+        assertEquals(2, repository.findAll(LoanFilter(borrowerName = null, bookId = null, onlyActive = false)).data.size)
     }
 
     @Test
@@ -124,7 +124,7 @@ class SQLiteLoanRepositoryTest {
         insertLoan(book, borrower = "Alice")
         insertLoan(book, borrower = "Bob")
 
-        val result = repository.findAll(LoanFilter(borrowerName = "ali")).data
+        val result = repository.findAll(LoanFilter(borrowerName = "ali", bookId = null, onlyActive = false)).data
 
         assertEquals(1, result.size)
         assertEquals("Alice", result.first().borrowerName)
@@ -138,7 +138,7 @@ class SQLiteLoanRepositoryTest {
         insertLoan(dune,  borrower = "Alice")
         insertLoan(found, borrower = "Bob")
 
-        val result = repository.findAll(LoanFilter(bookId = found.id)).data
+        val result = repository.findAll(LoanFilter(borrowerName = null, bookId = found.id, onlyActive = false)).data
 
         assertEquals(1, result.size)
         assertEquals(found.id, result.first().book.id)
@@ -154,7 +154,7 @@ class SQLiteLoanRepositoryTest {
         // Mark loan1 as returned
         repository.update(loan1.copy(returnedAt = LocalDate.now()))
 
-        val active = repository.findAll(LoanFilter(onlyActive = true)).data
+        val active = repository.findAll(LoanFilter(borrowerName = null, bookId = null, onlyActive = true)).data
 
         assertEquals(1, active.size)
         assertEquals("Bob", active.first().borrowerName)
@@ -187,7 +187,7 @@ class SQLiteLoanRepositoryTest {
         val book   = insertBook("Dune", author, quantity = 10)
         repeat(5) { insertLoan(book, borrower = "Borrower$it") }
 
-        val page2 = repository.findAll(LoanFilter(page = 2, size = 2))
+        val page2 = repository.findAll(LoanFilter(borrowerName = null, bookId = null, onlyActive = false, page = 2, size = 2))
 
         assertEquals(2,  page2.data.size)
         assertEquals(2,  page2.page)

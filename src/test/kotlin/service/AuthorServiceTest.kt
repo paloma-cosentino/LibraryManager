@@ -20,7 +20,7 @@ class AuthorServiceTest {
 
     @Test
     fun `getAllAuthors returns empty list when no authors exist`() {
-        assertTrue(service.getAllAuthors(AuthorFilter()).data.isEmpty())
+        assertTrue(service.getAllAuthors(AuthorFilter(name = null)).data.isEmpty())
     }
 
     @Test
@@ -28,7 +28,7 @@ class AuthorServiceTest {
         service.addAuthor("Frank Herbert")
         service.addAuthor("Isaac Asimov")
 
-        assertEquals(2, service.getAllAuthors(AuthorFilter()).data.size)
+        assertEquals(2, service.getAllAuthors(AuthorFilter(name = null)).data.size)
     }
 
     @Test

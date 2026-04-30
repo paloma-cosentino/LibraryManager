@@ -92,7 +92,7 @@ class SQLiteAuthorRepositoryTest {
 
     @Test
     fun `findAll returns empty list when no authors exist`() {
-        assertTrue(repository.findAll(AuthorFilter()).data.isEmpty())
+        assertTrue(repository.findAll(AuthorFilter(name = null)).data.isEmpty())
     }
 
     @Test
@@ -100,7 +100,7 @@ class SQLiteAuthorRepositoryTest {
         repository.save(Author(name = "Frank Herbert"))
         repository.save(Author(name = "Isaac Asimov"))
 
-        assertEquals(2, repository.findAll(AuthorFilter()).data.size)
+        assertEquals(2, repository.findAll(AuthorFilter(name = null)).data.size)
     }
 
     @Test
@@ -118,7 +118,7 @@ class SQLiteAuthorRepositoryTest {
     fun `findAll pagination returns correct page`() {
         repeat(5) { repository.save(Author(name = "Author $it")) }
 
-        val page2 = repository.findAll(AuthorFilter(page = 2, size = 2))
+        val page2 = repository.findAll(AuthorFilter(name = null, page = 2, size = 2))
 
         assertEquals(2,  page2.data.size)
         assertEquals(2,  page2.page)

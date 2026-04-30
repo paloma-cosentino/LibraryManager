@@ -33,7 +33,7 @@ class LoanServiceTest {
 
     @Test
     fun `getAllLoans returns empty list when no loans exist`() {
-        assertTrue(service.getAllLoans(LoanFilter()).data.isEmpty())
+        assertTrue(service.getAllLoans(LoanFilter(borrowerName = null, bookId = null, onlyActive = false)).data.isEmpty())
     }
 
     @Test
@@ -41,7 +41,7 @@ class LoanServiceTest {
         service.borrowBook(dune.id, "Alice", 14)
         service.borrowBook(foundation.id, "Bob", 7)
 
-        assertEquals(2, service.getAllLoans(LoanFilter()).data.size)
+        assertEquals(2, service.getAllLoans(LoanFilter(borrowerName = null, bookId = null, onlyActive = false)).data.size)
     }
 
     @Test
@@ -49,7 +49,7 @@ class LoanServiceTest {
         service.borrowBook(dune.id,       "Alice", 14)
         service.borrowBook(foundation.id, "Bob",   7)
 
-        val result = service.getAllLoans(LoanFilter(borrowerName = "Alice")).data
+        val result = service.getAllLoans(LoanFilter(borrowerName = "Alice", bookId = null, onlyActive = false)).data
 
         assertEquals(1, result.size)
         assertEquals("Alice", result.first().borrowerName)
@@ -61,7 +61,7 @@ class LoanServiceTest {
         service.borrowBook(foundation.id, "Bob", 7)
         service.returnBook(loan.id)
 
-        val active = service.getAllLoans(LoanFilter(onlyActive = true)).data
+        val active = service.getAllLoans(LoanFilter(borrowerName = null, bookId = null, onlyActive = true)).data
 
         assertEquals(1, active.size)
         assertEquals("Bob", active.first().borrowerName)

@@ -23,7 +23,7 @@ class BookServiceTest {
 
     @Test
     fun `getAllBooks returns empty list when no books exist`() {
-        assertTrue(service.getAllBooks(filter = BookFilter()).data.isEmpty())
+        assertTrue(service.getAllBooks(filter = BookFilter(title = null, author = null, category = null)).data.isEmpty())
     }
 
     @Test
@@ -31,7 +31,7 @@ class BookServiceTest {
         service.addBook("Clean Code", "Robert C. Martin", "Technology", 3)
         service.addBook("The Pragmatic Programmer", "David Thomas", "Technology", 5)
 
-        assertEquals(2, service.getAllBooks(BookFilter()).data.size)
+        assertEquals(2, service.getAllBooks(BookFilter(title = null, author = null, category = null)).data.size)
     }
 
     // ─── getBookById ──────────────────────────────────────────────────────────
@@ -130,7 +130,7 @@ class BookServiceTest {
         service.addBook("Duna", "Frank Herbert", "Science Fiction", 4)
         service.addBook("It", "Frank Herbert", "Horror", 2)
 
-        val allAuthors = authorRepository.findAll(AuthorFilter()).data.filter { it.name == "Frank Herbert" }
+        val allAuthors = authorRepository.findAll(AuthorFilter(name = null)).data.filter { it.name == "Frank Herbert" }
         assertEquals(1, allAuthors.size)
     }
 

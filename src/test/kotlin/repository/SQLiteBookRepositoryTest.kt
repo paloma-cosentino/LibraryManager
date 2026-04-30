@@ -42,7 +42,7 @@ class SQLiteBookRepositoryTest {
 
     @Test
     fun `findAll returns empty list when no books exist`() {
-        assertTrue(repository.findAll(BookFilter()).data.isEmpty())
+        assertTrue(repository.findAll(BookFilter(title = null, author = null, category = null)).data.isEmpty())
     }
 
     @Test
@@ -52,7 +52,7 @@ class SQLiteBookRepositoryTest {
         repository.save(Book(0, "Clean Code", robert, BookCategory.TECHNOLOGY, 3))
         repository.save(Book(0, "The Pragmatic Programmer", david, BookCategory.TECHNOLOGY, 5))
 
-        assertEquals(2, repository.findAll(BookFilter()).data.size)
+        assertEquals(2, repository.findAll(BookFilter(title = null, author = null, category = null)).data.size)
     }
 
     // ─── save ────────────────────────────────────────────────────────────────
@@ -91,7 +91,7 @@ class SQLiteBookRepositoryTest {
         val author = insertAuthor("Frank Herbert")
         repository.save(Book(0, "Duna", author, BookCategory.SCIENCE_FICTION, 5))
 
-        val found: Book = repository.findAll(BookFilter()).data.first()
+        val found: Book = repository.findAll(BookFilter(title = null, author = null, category = null)).data.first()
 
         assertEquals(BookCategory.SCIENCE_FICTION, found.category)
     }

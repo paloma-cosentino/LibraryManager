@@ -1,9 +1,9 @@
 package org.example.model
 
 data class BookFilter(
-    val title: String?= null,
-    val author: String?= null,
-    val category: String?= null,
+    val title: String?,
+    val author: String?,
+    val category: String?,
     val page: Int? = null,
     val size: Int? = null
 )
