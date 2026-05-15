@@ -16,14 +16,6 @@ import org.http4k.lens.int
 import org.http4k.routing.bind
 import org.http4k.routing.routes
 
-fun authorRoutes(handler: AuthorHandler) = routes(
-    "/authors"      bind GET    to handler.getAll,
-    "/authors"      bind POST   to handler.create,
-    "/authors/{id}" bind GET    to handler.getById,
-    "/authors/{id}" bind PUT    to handler.update,
-    "/authors/{id}" bind DELETE to handler.delete
-)
-
 class AuthorHandler(private val service: IAuthorService){
     private val authorLens = Body.auto<Author>().toLens()
     private val idPath     = Path.int().of("id")
@@ -67,3 +59,12 @@ class AuthorHandler(private val service: IAuthorService){
         else Response.Companion(Status.NOT_FOUND)
     }
 }
+
+
+fun authorRoutes(handler: AuthorHandler) = routes(
+    "/authors"      bind GET    to handler.getAll,
+    "/authors"      bind POST   to handler.create,
+    "/authors/{id}" bind GET    to handler.getById,
+    "/authors/{id}" bind PUT    to handler.update,
+    "/authors/{id}" bind DELETE to handler.delete
+)
