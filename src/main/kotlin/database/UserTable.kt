@@ -7,4 +7,5 @@ object UserTable : Table("users")   {
     val name = varchar("name", 255)
     val email = varchar("email", 255).uniqueIndex()
     override val primaryKey = PrimaryKey(id)
+    val passwordHash = varchar("password_hash", 255)
 }
