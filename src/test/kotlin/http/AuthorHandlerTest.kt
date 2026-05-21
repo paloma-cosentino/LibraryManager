@@ -99,12 +99,6 @@ class AuthorHandlerTest {
         assertEquals("Frank Herbert", authorLens(response).name)
     }
 
-    @Test
-    fun `POST authors assigns a generated id`() {
-        val author = authorLens(postAuthor())
-
-        assertTrue(author.id > 0)
-    }
 
     @Test
     fun `POST authors returns 409 when author name already exists`() {

@@ -43,7 +43,8 @@ class AuthorHandler(private val service: IAuthorService){
 
     val create: HttpHandler = { request ->
         handleAuthorExceptions {
-            val saved = service.addAuthor(name = authorLens(request).name)
+            val saved = service.addAuthor(
+                name = authorLens(request).name)
             authorLens(saved, Response.Companion(Status.OK))
         }
     }
