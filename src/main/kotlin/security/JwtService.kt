@@ -10,7 +10,7 @@ import java.util.*
 object JwtService {
     private val secret = System.getenv("JWT_SECRET")
         ?: error("Variável de ambiente JWT_SECRET não definida")
-    val algorithm = Algorithm.HMAC256(secret)
+    val algorithm: Algorithm = Algorithm.HMAC256(secret)
     val verifier: JWTVerifier = JWT.require(algorithm).build()
 
     fun generateToken(userId: Int, email: String): String {
