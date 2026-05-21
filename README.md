@@ -1,162 +1,262 @@
 # LibraryManager
 
-A Kotlin study project to build a **library inventory manager**.
+A Kotlin study project to build a **library inventory manager** with a REST API, user authentication, and a planned web UI.
 
 ## Overview
 
-The goal of this project is to practice domain modeling, Kotlin best practices, and Gradle-based project organization.
+The project follows a layered architecture (model → repository → service → HTTP handler), with SQLite persistence, JWT-based authentication, and a comprehensive unit-test suite.
 
-The project has a functional REST API with a layered architecture (model → repository → service → HTTP handler), SQLite persistence, and a comprehensive unit-test suite.
+---
 
 ## Features
 
-### Currently implemented
-- Kotlin project structure with Gradle (Kotlin DSL).
-- `Book` domain model (`id`, `title`, `author`, `category`, `quantity`) with `BookCategory` enum.
-- `Author` domain model (`id`, `name`).
-- `BookRepository` and `AuthorRepository` interfaces with full CRUD contract.
-- `SQLiteBookRepository` and `SQLiteAuthorRepository` — Jetbrains Exposed-based implementations persisting to a local SQLite file (`library.db`).
-- `DatabaseFactory` — initialises the SQLite connection and creates the schema on first run.
-- `BookTable` and `AuthorTable` — Exposed `Table` definitions.
-- `BookService` — service layer with auto-creation of authors on `addBook`/`updateBook` if the author does not yet exist.
-- `AuthorService` — service layer for author management.
-- `BookHandler` + `bookRoutes` — REST handlers for `/books` (GET all, GET by id, POST, PUT, DELETE).
-- `AuthorHandler` + `authorRoutes` — REST handlers for `/authors` (GET all, GET by id, POST, PUT, DELETE).
-- `InMemoryBookRepository` and `InMemoryAuthorRepository` — lightweight in-memory implementations used exclusively in tests.
-- Unit tests for `BookService`, `BookHandler`, and `SQLiteBookRepository`.
-- `Main.kt` bootstraps the database and starts an HTTP server on port **8080**.
+### ✅ Implemented
 
-### Planned (next increments)
-- Inventory control (stock-in, stock-out, and stock adjustments).
-- Search and filtering by title, author, and category.
-- Low-stock alerts.
+- **Books** — full CRUD (`GET`, `POST`, `PUT`, `DELETE`) with category validation and author auto-creation
+- **Authors** — full CRUD
+- **Loans** — create loan, list, get by id, register return; tracks availability and overdue status
+- **Users** — full CRUD with BCrypt password hashing
+- **Authentication** — `POST /auth/login` returns a signed JWT token; all routes except login are protected by `AuthFilter`
+- **Pagination** — all list endpoints support `page` and `size` query params
+- **Filtering** — books by title/category/author, authors by name, loans by active status, users by name
+- **Unit tests** — handler, service and SQLite repository tests for all entities
 
-## REST API
+### 🔲 Planned
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/books` | List all books |
-| GET | `/books/{id}` | Get book by id |
-| POST | `/books` | Create a book (auto-creates author if needed) |
-| PUT | `/books/{id}` | Update a book |
-| DELETE | `/books/{id}` | Delete a book |
-| GET | `/authors` | List all authors |
-| GET | `/authors/{id}` | Get author by id |
-| POST | `/authors` | Create an author |
-| PUT | `/authors/{id}` | Update an author |
-| DELETE | `/authors/{id}` | Delete an author |
+- Web UI with Handlebars templates and JavaScript (see `TODOLIST.md`)
 
-### POST `/books` — request body example
-```json
+---
+
+## Authentication
+
+All endpoints except `POST /users` and `POST /auth/login` require a valid JWT token.
+
+**Register a user:**
+```http
+POST /users
+Content-Type: application/json
+
 {
-  "title": "Duna",
-  "author": "Frank Herbert",
-  "category": "Science Fiction",
-  "quantity": 4
+  "name": "Alice",
+  "email": "alice@example.com",
+  "passwordHash": "mypassword"
 }
 ```
 
-Valid categories: `Fiction`, `Non-Fiction`, `Science Fiction`, `Fantasy`, `Horror`, `Mystery`, `Biography`, `History`, `Science`, `Technology`.
+**Login:**
+```http
+POST /auth/login
+Content-Type: application/json
+
+{
+  "email": "alice@example.com",
+  "password": "mypassword"
+}
+```
+
+Response:
+```json
+{
+  "token": "eyJ...",
+  "user": { "id": 1, "name": "Alice", "email": "alice@example.com" }
+}
+```
+
+**Use the token in subsequent requests:**
+```http
+GET /books
+Authorization: Bearer eyJ...
+```
+
+---
+
+## REST API
+
+### Auth
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| POST | `/auth/login` | ❌ | Login — returns JWT token |
+
+### Users
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| POST | `/users` | ❌ | Create user |
+| GET | `/users` | ✅ | List users (paginated, filter by `name`) |
+| GET | `/users/email?email=` | ✅ | Get user by email |
+| PUT | `/users/{id}` | ✅ | Update user |
+| DELETE | `/users/{id}` | ✅ | Delete user |
+
+### Books
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| GET | `/books` | ✅ | List books (paginated, filter by `title`, `category`, `authorId`) |
+| GET | `/books/{id}` | ✅ | Get book by id |
+| POST | `/books` | ✅ | Create book |
+| PUT | `/books/{id}` | ✅ | Update book |
+| DELETE | `/books/{id}` | ✅ | Delete book |
+
+### Authors
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| GET | `/authors` | ✅ | List authors (paginated, filter by `name`) |
+| GET | `/authors/{id}` | ✅ | Get author by id |
+| POST | `/authors` | ✅ | Create author |
+| PUT | `/authors/{id}` | ✅ | Update author |
+| DELETE | `/authors/{id}` | ✅ | Delete author |
+
+### Loans
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| GET | `/loans` | ✅ | List loans (paginated, filter by `onlyActive`) |
+| GET | `/loans/{id}` | ✅ | Get loan by id |
+| POST | `/loans` | ✅ | Create loan |
+| PATCH | `/loans/{id}/return` | ✅ | Register return |
+
+### Valid Book Categories
+`Fiction`, `Non-Fiction`, `Science Fiction`, `Fantasy`, `Horror`, `Mystery`, `Biography`, `History`, `Science`, `Technology`
+
+---
 
 ## Technologies
 
-| Technology | Version |
-|---|---|
-| Kotlin | 2.3.0 |
-| Gradle (Kotlin DSL) | Wrapper |
-| JDK | 17 |
-| Jetbrains Exposed | 0.57.0 |
-| SQLite JDBC | 3.47.1.0 |
-| http4k-core | 5.35.0.0 |
-| http4k-format-jackson | 5.35.0.0 |
-| http4k-server-jetty | 5.35.0.0 |
-| JUnit (via `kotlin("test")`) | — |
+| Technology | Version | Role |
+|---|---|---|
+| Kotlin | 2.3.0 | Main language |
+| Gradle (Kotlin DSL) | Wrapper | Build tool |
+| JDK | 17 | Runtime |
+| http4k-core | 5.35.0.0 | HTTP framework (functional, lenses) |
+| http4k-format-jackson | 5.35.0.0 | JSON serialization |
+| http4k-server-jetty | 5.35.0.0 | Embedded HTTP server |
+| Jetbrains Exposed | 0.57.0 | SQL DSL / ORM |
+| SQLite JDBC | 3.47.1.0 | Embedded database |
+| jbcrypt | 0.4 | Password hashing (BCrypt) |
+| java-jwt (Auth0) | 4.4.0 | JWT generation and validation |
+| Kotlin Test | — | Test framework (JUnit 5) |
 
-## Folder structure
+---
 
-```text
+## Folder Structure
+
+```
 LibraryManager/
-├── build.gradle.kts
-├── settings.gradle.kts
 ├── library.db                              # SQLite database (auto-created on first run)
 └── src/
-    ├── main/
-    │   └── kotlin/
-    │       ├── Main.kt                     # Entry point — starts HTTP server on :8080
-    │       ├── database/
-    │       │   ├── AuthorTable.kt
-    │       │   ├── BookTable.kt
-    │       │   └── DatabaseFactory.kt
-    │       ├── http/
-    │       │   ├── AuthorHandler.kt
-    │       │   ├── AuthorRoutes.kt
-    │       │   ├── BookHandler.kt
-    │       │   ├── BookRoutes.kt
-    │       │   └── CreateBookRequest.kt
-    │       ├── model/
-    │       │   ├── Author.kt
-    │       │   ├── Book.kt
-    │       │   ├── BookCategory.kt
-    │       │   └── Exceptions.kt
-    │       ├── repository/
-    │       │   ├── AuthorRepository.kt
-    │       │   ├── BookRepository.kt
-    │       │   ├── SQLiteAuthorRepository.kt
-    │       │   └── SQLiteBookRepository.kt
-    │       └── service/
-    │           ├── AuthorService.kt
-    │           └── BookService.kt
-    └── test/
-        └── kotlin/
-            ├── http/
-            │   └── BookHandlerTest.kt
-            ├── repository/
-            │   ├── InMemoryAuthorRepository.kt
-            │   ├── InMemoryBookRepository.kt
-            │   └── SQLiteBookRepositoryTest.kt
-            └── service/
-                └── BookServiceTest.kt
+    ├── main/kotlin/
+    │   ├── Main.kt                         # Entry point — starts HTTP server on :8080
+    │   ├── database/
+    │   │   ├── DatabaseFactory.kt
+    │   │   ├── AuthorTable.kt
+    │   │   ├── BookTable.kt
+    │   │   ├── LoanTable.kt
+    │   │   └── UserTable.kt
+    │   ├── http/
+    │   │   ├── AuthFilter.kt               # JWT middleware
+    │   │   ├── AuthorHandler.kt
+    │   │   ├── BookHandler.kt
+    │   │   ├── BookRequest.kt
+    │   │   ├── BookRoutes.kt
+    │   │   ├── HandlerUtils.kt
+    │   │   ├── LoanHandler.kt
+    │   │   ├── LoanRequest.kt
+    │   │   ├── LoanRoutes.kt
+    │   │   ├── LoginRequest.kt
+    │   │   └── UserHandler.kt
+    │   ├── model/
+    │   │   ├── Author.kt
+    │   │   ├── AuthorExceptions.kt
+    │   │   ├── AuthorFilter.kt
+    │   │   ├── Book.kt
+    │   │   ├── BookCategory.kt
+    │   │   ├── BookExceptions.kt
+    │   │   ├── BookFilter.kt
+    │   │   ├── Loan.kt
+    │   │   ├── LoanExceptions.kt
+    │   │   ├── LoanFilter.kt
+    │   │   ├── LoginResponse.kt
+    │   │   ├── PagedResult.kt
+    │   │   ├── User.kt
+    │   │   ├── UserExceptions.kt
+    │   │   ├── UserFilter.kt
+    │   │   └── UserResponse.kt
+    │   ├── repository/
+    │   │   ├── AuthorRepository.kt
+    │   │   ├── BookRepository.kt
+    │   │   ├── LoanRepository.kt
+    │   │   ├── SQLiteAuthorRepository.kt
+    │   │   ├── SQLiteBookRepository.kt
+    │   │   ├── SQLiteLoanRepository.kt
+    │   │   ├── SQLiteUserRepository.kt
+    │   │   └── UserRepository.kt
+    │   ├── security/
+    │   │   └── JwtService.kt               # JWT generation & validation
+    │   └── service/
+    │       ├── AuthorService.kt
+    │       ├── BookService.kt
+    │       ├── IAuthorService.kt
+    │       ├── IBookService.kt
+    │       ├── ILoanService.kt
+    │       ├── IUserService.kt
+    │       ├── LoanService.kt
+    │       └── UserService.kt
+    └── test/kotlin/
+        ├── http/
+        │   ├── AuthorHandlerTest.kt
+        │   ├── BookHandlerTest.kt
+        │   ├── LoanHandlerTest.kt
+        │   └── UserHandlerTest.kt
+        ├── repository/
+        │   ├── InMemoryAuthorRepository.kt
+        │   ├── InMemoryBookRepository.kt
+        │   ├── InMemoryLoanRepository.kt
+        │   ├── InMemoryUserRepository.kt
+        │   ├── SQLiteAuthorRepositoryTest.kt
+        │   ├── SQLiteBookRepositoryTest.kt
+        │   ├── SQLiteLoanRepositoryTest.kt
+        │   └── SQLiteUserRepositoryTest.kt
+        └── service/
+            ├── AuthorServiceTest.kt
+            ├── BookServiceTest.kt
+            ├── LoanServiceTest.kt
+            └── UserServiceTest.kt
 ```
+
+---
 
 ## Prerequisites
 
-- JDK 17 installed.
-- Execution permission for the Gradle Wrapper (`gradlew`).
+- JDK 17
+- `JWT_SECRET` environment variable set
 
-## How to run
+## How to Run
 
-On macOS/Linux:
+**macOS/Linux:**
 
 ```bash
-cd /Users/pcu4808/IdeaProjects/LibraryManager
+export JWT_SECRET="your-secret-key"
 ./gradlew run
 ```
 
 The API will be available at `http://localhost:8080`.
 
-To run tests:
+**Run tests:**
 
 ```bash
-./gradlew test
+JWT_SECRET=your-secret-key ./gradlew test
 ```
 
-On Windows (PowerShell):
+**Windows (PowerShell):**
 
 ```powershell
-cd C:\path\to\LibraryManager
+$env:JWT_SECRET = "your-secret-key"
 .\gradlew.bat run
 .\gradlew.bat test
 ```
 
-## Next steps
+> ⚠️ The application will fail to start if `JWT_SECRET` is not set.
 
-- Implement stock transaction logic (`StockTransaction`).
-- Add search/filter capabilities in `BookService`.
-- Add low-stock threshold alerts.
+---
 
 ## Contributing
-
-This is a study project, but contributions are welcome:
 
 1. Fork the repository.
 2. Create a branch for your feature (`git checkout -b feat/my-feature`).
@@ -166,4 +266,4 @@ This is a study project, but contributions are welcome:
 
 ## License
 
-Define your preferred license (for example, MIT) before publishing to production.
+MIT
