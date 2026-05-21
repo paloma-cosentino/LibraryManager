@@ -15,7 +15,8 @@ class SQLiteUserRepository(private val database: Database) : UserRepository {
     private fun ResultRow.toUser() = User(
         id = this[UserTable.id],
         name = this[name],
-        email = this[email]
+        email = this[email],
+        passwordHash = this[UserTable.passwordHash]
     )
     override fun findAll(filter: UserFilter): PagedResult<User> = transaction(database) {
         var query =UserTable.selectAll()
@@ -55,6 +56,7 @@ class SQLiteUserRepository(private val database: Database) : UserRepository {
             id = UserTable.insert {
                 it[name] = user.name
                 it[email] = user.email
+                it[passwordHash] = user.passwordHash
             } get UserTable.id
         )
     }
@@ -62,6 +64,7 @@ class SQLiteUserRepository(private val database: Database) : UserRepository {
         val updatedRow = UserTable.update({ UserTable.id eq user.id }) {
             it[name] = user.name
             it[email] = user.email
+            it[passwordHash] = user.passwordHash
         }
         if (updatedRow == 0) null else user
     }

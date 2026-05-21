@@ -8,6 +8,7 @@ import org.http4k.core.Response
 import org.http4k.core.Status.Companion.BAD_REQUEST
 import org.http4k.core.Status.Companion.CONFLICT
 import org.http4k.core.Status.Companion.NOT_FOUND
+import org.http4k.core.Status.Companion.UNAUTHORIZED
 import org.http4k.lens.LensFailure
 
 fun handleBookExceptions(block: () -> Response): Response = try {
@@ -34,8 +35,8 @@ catch (e: LensFailure)                                { Response(BAD_REQUEST).bo
 
 fun handleUserExceptions(block: () -> Response): Response = try {
     block()
-} catch (e: UserExceptions.UserIdNotFoundException)    { Response(NOT_FOUND).body(e.message!!) }
-catch (e: UserExceptions.UserEmailNotFoundException) { Response(NOT_FOUND).body(e.message!!) }
-catch (e: UserExceptions.DuplicateUserException)     { Response(CONFLICT).body(e.message!!) }
-catch (e: LensFailure)                         { Response(BAD_REQUEST).body(e.message ?: "Invalid request body")
-}
+} catch (e: UserExceptions.UserIdNotFoundException)      { Response(NOT_FOUND).body(e.message!!) }
+catch (e: UserExceptions.UserEmailNotFoundException)   { Response(NOT_FOUND).body(e.message!!) }
+catch (e: UserExceptions.DuplicateUserException)       { Response(CONFLICT).body(e.message!!) }
+catch (e: UserExceptions.InvalidCredentialsException) { Response(UNAUTHORIZED).body(e.message!!) }
+catch (e: LensFailure)                                 { Response(BAD_REQUEST).body(e.message ?: "Invalid request body") }

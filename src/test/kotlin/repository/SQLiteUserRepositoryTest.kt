@@ -31,14 +31,14 @@ class SQLiteUserRepositoryTest {
 
     @Test
     fun `save returns user with generated id`() {
-        val saved = repository.save(User(name = "Alice", email = "alice@example.com"))
+        val saved = repository.save(User(name = "Alice", email = "alice@example.com", passwordHash = ""))
 
         assertTrue(saved.id > 0)
     }
 
     @Test
     fun `save persists user data correctly`() {
-        val saved = repository.save(User(name = "Alice", email = "alice@example.com"))
+        val saved = repository.save(User(name = "Alice", email = "alice@example.com", passwordHash = ""))
 
         assertEquals("Alice", saved.name)
         assertEquals("alice@example.com", saved.email)
@@ -46,8 +46,8 @@ class SQLiteUserRepositoryTest {
 
     @Test
     fun `save assigns unique ids to each user`() {
-        val u1 = repository.save(User(name = "Alice", email = "alice@example.com"))
-        val u2 = repository.save(User(name = "Bob",   email = "bob@example.com"))
+        val u1 = repository.save(User(name = "Alice", email = "alice@example.com", passwordHash = ""))
+        val u2 = repository.save(User(name = "Bob",   email = "bob@example.com", passwordHash = ""))
 
         assertNotEquals(u1.id, u2.id)
     }
@@ -56,7 +56,7 @@ class SQLiteUserRepositoryTest {
 
     @Test
     fun `findById returns user when it exists`() {
-        val saved = repository.save(User(name = "Alice", email = "alice@example.com"))
+        val saved = repository.save(User(name = "Alice", email = "alice@example.com", passwordHash = ""))
 
         val found = repository.findById(saved.id)
 
@@ -74,7 +74,7 @@ class SQLiteUserRepositoryTest {
 
     @Test
     fun `findByEmail returns user when email matches`() {
-        repository.save(User(name = "Alice", email = "alice@example.com"))
+        repository.save(User(name = "Alice", email = "alice@example.com", passwordHash = ""))
 
         val found = repository.findByEmail("alice@example.com")
 
@@ -84,7 +84,7 @@ class SQLiteUserRepositoryTest {
 
     @Test
     fun `findByEmail returns null when email does not match`() {
-        repository.save(User(name = "Alice", email = "alice@example.com"))
+        repository.save(User(name = "Alice", email = "alice@example.com", passwordHash = ""))
 
         assertNull(repository.findByEmail("nobody@example.com"))
     }
@@ -98,16 +98,16 @@ class SQLiteUserRepositoryTest {
 
     @Test
     fun `findAll returns all saved users`() {
-        repository.save(User(name = "Alice", email = "alice@example.com"))
-        repository.save(User(name = "Bob",   email = "bob@example.com"))
+        repository.save(User(name = "Alice", email = "alice@example.com", passwordHash = ""))
+        repository.save(User(name = "Bob",   email = "bob@example.com", passwordHash = ""))
 
         assertEquals(2, repository.findAll(UserFilter(name = null)).data.size)
     }
 
     @Test
     fun `findAll filters by name (partial)`() {
-        repository.save(User(name = "Alice", email = "alice@example.com"))
-        repository.save(User(name = "Bob",   email = "bob@example.com"))
+        repository.save(User(name = "Alice", email = "alice@example.com", passwordHash = ""))
+        repository.save(User(name = "Bob",   email = "bob@example.com", passwordHash = ""))
 
         val result = repository.findAll(UserFilter(name = "Ali")).data
 
@@ -117,7 +117,7 @@ class SQLiteUserRepositoryTest {
 
     @Test
     fun `findAll pagination returns correct page`() {
-        repeat(5) { repository.save(User(name = "User $it", email = "user$it@example.com")) }
+        repeat(5) { repository.save(User(name = "User $it", email = "user$it@example.com", passwordHash = "")) }
 
         val page2 = repository.findAll(UserFilter(name = null, page = 2, size = 2))
 
@@ -131,7 +131,7 @@ class SQLiteUserRepositoryTest {
 
     @Test
     fun `update changes user data`() {
-        val saved   = repository.save(User(name = "Alice", email = "alice@example.com"))
+        val saved   = repository.save(User(name = "Alice", email = "alice@example.com", passwordHash = ""))
         val updated = repository.update(saved.copy(name = "Alice Updated", email = "updated@example.com"))
 
         assertNotNull(updated)
@@ -141,7 +141,7 @@ class SQLiteUserRepositoryTest {
 
     @Test
     fun `update persists changes to database`() {
-        val saved = repository.save(User(name = "Alice", email = "alice@example.com"))
+        val saved = repository.save(User(name = "Alice", email = "alice@example.com", passwordHash = ""))
         repository.update(saved.copy(name = "Alice Updated", email = "updated@example.com"))
 
         val found = repository.findById(saved.id)
@@ -151,7 +151,7 @@ class SQLiteUserRepositoryTest {
 
     @Test
     fun `update returns null when user does not exist`() {
-        val result = repository.update(User(id = 999, name = "Ghost", email = "ghost@example.com"))
+        val result = repository.update(User(id = 999, name = "Ghost", email = "ghost@example.com", passwordHash = ""))
 
         assertNull(result)
     }
@@ -160,7 +160,7 @@ class SQLiteUserRepositoryTest {
 
     @Test
     fun `delete removes user and returns true`() {
-        val saved  = repository.save(User(name = "Alice", email = "alice@example.com"))
+        val saved  = repository.save(User(name = "Alice", email = "alice@example.com", passwordHash = ""))
         val result = repository.delete(saved.id)
 
         assertTrue(result)
@@ -174,8 +174,8 @@ class SQLiteUserRepositoryTest {
 
     @Test
     fun `delete only removes the targeted user`() {
-        val u1 = repository.save(User(name = "Alice", email = "alice@example.com"))
-        val u2 = repository.save(User(name = "Bob",   email = "bob@example.com"))
+        val u1 = repository.save(User(name = "Alice", email = "alice@example.com", passwordHash = ""))
+        val u2 = repository.save(User(name = "Bob",   email = "bob@example.com", passwordHash = ""))
 
         repository.delete(u1.id)
 

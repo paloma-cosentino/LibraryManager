@@ -1,15 +1,7 @@
 package org.example
 
 import org.example.database.DatabaseFactory
-import org.example.http.AuthorHandler
-import org.example.http.BookHandler
-import org.example.http.LoanHandler
-import org.example.http.UserHandler
-import org.example.http.authorRoutes
-import org.example.http.bookRoutes
-import org.example.http.loanRoutes
-import org.example.http.userRoutes
-
+import org.example.http.*
 import org.example.repository.SQLiteAuthorRepository
 import org.example.repository.SQLiteBookRepository
 import org.example.repository.SQLiteLoanRepository
@@ -18,6 +10,8 @@ import org.example.service.AuthorService
 import org.example.service.BookService
 import org.example.service.LoanService
 import org.example.service.UserService
+import org.http4k.core.Request
+import org.http4k.core.Status
 import org.http4k.routing.routes
 import org.http4k.server.Jetty
 import org.http4k.server.asServer
@@ -40,9 +34,21 @@ fun main() {
     val userService    = UserService(userRepository)
     val userHandler    = UserHandler(userService)
 
-    routes(bookRoutes(bookHandler), authorRoutes(authorHandler), loanRoutes(loanHandler), userRoutes(userHandler))
-        .asServer(Jetty(8080))
-        .start()
+    val publicRoutes    = loginRoutes(userHandler)
+    val protectedRoutes = routes(
+        bookRoutes(bookHandler),
+        authorRoutes(authorHandler),
+        loanRoutes(loanHandler),
+        userRoutes(userHandler)
+    )
+
+    val app = { request: Request ->
+        val publicResponse = publicRoutes(request)
+        if (publicResponse.status != Status.NOT_FOUND) publicResponse
+        else authFilter(protectedRoutes)(request)
+    }
+
+    app.asServer(Jetty(8080)).start()
 
     println("LibraryManager running on http://localhost:8080")
 }

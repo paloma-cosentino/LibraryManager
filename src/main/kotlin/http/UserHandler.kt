@@ -1,5 +1,6 @@
 package org.example.http
 
+import org.example.model.LoginResponse
 import org.example.model.PagedResult
 import org.example.model.User
 import org.example.model.UserFilter
@@ -18,6 +19,8 @@ import org.http4k.routing.routes
 
 class UserHandler(private val service: IUserService) {
     private val userLens = Body.auto<User>().toLens()
+    private val loginRequestLens = Body.auto<LoginRequest>().toLens()
+    private val loginResponseLens = Body.auto<LoginResponse>().toLens()
     private val idPath   = Path.int().of("id")
     
     private val nameQuery = Query.optional("name")
@@ -46,7 +49,8 @@ class UserHandler(private val service: IUserService) {
         handleUserExceptions {
             val saved = service.addUser(
                 name = userLens(request).name,
-                email = userLens(request).email
+                email = userLens(request).email,
+                password = userLens(request).passwordHash
             )
             userLens(saved, Response.Companion(Status.OK))
         }
@@ -66,6 +70,13 @@ class UserHandler(private val service: IUserService) {
             else Response.Companion(Status.NOT_FOUND)
         }
     }
+    val login: HttpHandler = { request ->
+        val body = loginRequestLens(request)
+        handleUserExceptions {
+            val response = service.login(body.email, body.password)
+            loginResponseLens(response, Response(Status.OK))
+        }
+    }
 }
 
 fun userRoutes(handler: UserHandler) = routes(
@@ -73,5 +84,9 @@ fun userRoutes(handler: UserHandler) = routes(
     "/users/email" bind GET to handler.getByEmail,
     "/users" bind POST to handler.create,
     "/users/{id}" bind PUT to handler.update,
-    "/users/{id}" bind DELETE to handler.delete
+    "/users/{id}" bind DELETE to handler.delete,
+)
+
+fun loginRoutes(handler: UserHandler) = routes(
+    "/auth/login" bind POST to handler.login
 )

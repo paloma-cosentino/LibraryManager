@@ -1,5 +1,6 @@
 package org.example.http
 
+import org.example.model.LoginResponse
 import org.example.model.PagedResult
 import org.example.model.User
 import org.example.repository.InMemoryUserRepository
@@ -12,29 +13,41 @@ import org.http4k.core.Status.Companion.CONFLICT
 import org.http4k.core.Status.Companion.NOT_FOUND
 import org.http4k.core.Status.Companion.NO_CONTENT
 import org.http4k.core.Status.Companion.OK
+import org.http4k.core.Status.Companion.UNAUTHORIZED
 import org.http4k.format.Jackson.auto
 import kotlin.test.*
 
 class UserHandlerTest {
 
     private lateinit var app: HttpHandler
-    private val userLens       = Body.auto<User>().toLens()
-    private val pagedUsersLens = Body.auto<PagedResult<User>>().toLens()
+    private lateinit var authApp: HttpHandler
+    private val userLens          = Body.auto<User>().toLens()
+    private val pagedUsersLens    = Body.auto<PagedResult<User>>().toLens()
+    private val loginResponseLens = Body.auto<LoginResponse>().toLens()
 
     @BeforeTest
     fun setUp() {
         val service = UserService(InMemoryUserRepository())
         val handler = UserHandler(service)
-        app = userRoutes(handler)
+        app     = userRoutes(handler)
+        authApp = loginRoutes(handler)
     }
+
 
     // ─── helpers ─────────────────────────────────────────────────────────────
 
-    private fun postUser(name: String = "Alice", email: String = "alice@example.com") =
+    private fun postUser(name: String = "Alice", email: String = "alice@example.com", password: String = "senha123") =
         app(
             Request(POST, "/users")
                 .header("Content-Type", "application/json")
-                .body("""{"id":0,"name":"$name","email":"$email"}""")
+                .body("""{"id":0,"name":"$name","email":"$email","passwordHash":"$password"}""")
+        )
+
+    private fun postLogin(email: String, password: String) =
+        authApp(
+            Request(POST, "/auth/login")
+                .header("Content-Type", "application/json")
+                .body("""{"email":"$email","password":"$password"}""")
         )
 
     // ─── GET /users ───────────────────────────────────────────────────────────
@@ -124,7 +137,7 @@ class UserHandlerTest {
         val response = app(
             Request(PUT, "/users/${created.id}")
                 .header("Content-Type", "application/json")
-                .body("""{"id":0,"name":"Alice Updated","email":"updated@example.com"}""")
+                .body("""{"id":0,"name":"Alice Updated","email":"updated@example.com","passwordHash":""}""")
         )
 
         assertEquals(OK, response.status)
@@ -138,7 +151,7 @@ class UserHandlerTest {
         val response = app(
             Request(PUT, "/users/999")
                 .header("Content-Type", "application/json")
-                .body("""{"id":0,"name":"Ghost","email":"ghost@example.com"}""")
+                .body("""{"id":0,"name":"Ghost","email":"ghost@example.com","passwordHash":""}""")
         )
 
         assertEquals(NOT_FOUND, response.status)
@@ -160,5 +173,71 @@ class UserHandlerTest {
 
         assertEquals(NOT_FOUND, response.status)
     }
-}
 
+    // ─── POST /auth/login ─────────────────────────────────────────────────────
+
+    @Test
+    fun `POST auth login returns 200 and token when credentials are valid`() {
+        postUser("Alice", "alice@example.com", "senha123")
+
+        val response = postLogin("alice@example.com", "senha123")
+
+        assertEquals(OK, response.status)
+        val loginResponse = loginResponseLens(response)
+        assertTrue(loginResponse.token.isNotBlank())
+        assertEquals("alice@example.com", loginResponse.user.email)
+    }
+
+    @Test
+    fun `POST auth login returns 401 when password is wrong`() {
+        postUser("Alice", "alice@example.com", "senha123")
+
+        val response = postLogin("alice@example.com", "senhaErrada")
+
+        assertEquals(UNAUTHORIZED, response.status)
+    }
+
+    @Test
+    fun `POST auth login returns 404 when user does not exist`() {
+        val response = postLogin("nobody@example.com", "senha123")
+
+        assertEquals(NOT_FOUND, response.status)
+    }
+
+    // ─── authFilter — rotas protegidas ────────────────────────────────────────
+
+    @Test
+    fun `protected route returns 401 without token`() {
+        val protectedApp = authFilter(app)
+
+        val response = protectedApp(Request(GET, "/users"))
+
+        assertEquals(UNAUTHORIZED, response.status)
+    }
+
+    @Test
+    fun `protected route returns 401 with invalid token`() {
+        val protectedApp = authFilter(app)
+
+        val response = protectedApp(
+            Request(GET, "/users")
+                .header("Authorization", "Bearer token.invalido.aqui")
+        )
+
+        assertEquals(UNAUTHORIZED, response.status)
+    }
+
+    @Test
+    fun `protected route allows access with valid token`() {
+        postUser("Alice", "alice@example.com", "senha123")
+        val token = loginResponseLens(postLogin("alice@example.com", "senha123")).token
+
+        val protectedApp = authFilter(app)
+        val response = protectedApp(
+            Request(GET, "/users")
+                .header("Authorization", "Bearer $token")
+        )
+
+        assertEquals(OK, response.status)
+    }
+}
