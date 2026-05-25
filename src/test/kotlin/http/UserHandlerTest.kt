@@ -3,6 +3,7 @@ package org.example.http
 import org.example.model.LoginResponse
 import org.example.model.PagedResult
 import org.example.model.User
+import org.example.model.UserResponse
 import org.example.repository.InMemoryUserRepository
 import org.example.service.UserService
 import org.http4k.core.Body
@@ -15,6 +16,7 @@ import org.http4k.core.Status.Companion.NO_CONTENT
 import org.http4k.core.Status.Companion.OK
 import org.http4k.core.Status.Companion.UNAUTHORIZED
 import org.http4k.format.Jackson.auto
+import org.http4k.routing.routes
 import kotlin.test.*
 
 class UserHandlerTest {
@@ -22,6 +24,7 @@ class UserHandlerTest {
     private lateinit var app: HttpHandler
     private lateinit var authApp: HttpHandler
     private val userLens          = Body.auto<User>().toLens()
+    private val userResponseLens  = Body.auto<UserResponse>().toLens()
     private val pagedUsersLens    = Body.auto<PagedResult<User>>().toLens()
     private val loginResponseLens = Body.auto<LoginResponse>().toLens()
 
@@ -29,15 +32,17 @@ class UserHandlerTest {
     fun setUp() {
         val service = UserService(InMemoryUserRepository())
         val handler = UserHandler(service)
-        app     = userRoutes(handler)
-        authApp = loginRoutes(handler)
+        val public  = publicUserRoutes(handler)
+        val protected = userRoutes(handler)
+        authApp = public
+        app     = routes(public, protected)
     }
 
 
     // ─── helpers ─────────────────────────────────────────────────────────────
 
     private fun postUser(name: String = "Alice", email: String = "alice@example.com", password: String = "senha123") =
-        app(
+        authApp(
             Request(POST, "/users")
                 .header("Content-Type", "application/json")
                 .body("""{"id":0,"name":"$name","email":"$email","passwordHash":"$password"}""")
@@ -116,7 +121,7 @@ class UserHandlerTest {
         val response = postUser("Alice", "alice@example.com")
 
         assertEquals(OK, response.status)
-        val user = userLens(response)
+        val user = userResponseLens(response)
         assertEquals("Alice", user.name)
         assertEquals("alice@example.com", user.email)
     }
@@ -133,7 +138,7 @@ class UserHandlerTest {
 
     @Test
     fun `PUT users returns 200 and updated user`() {
-        val created  = userLens(postUser())
+        val created  = userResponseLens(postUser())
         val response = app(
             Request(PUT, "/users/${created.id}")
                 .header("Content-Type", "application/json")
@@ -161,7 +166,7 @@ class UserHandlerTest {
 
     @Test
     fun `DELETE users returns 204 when user is deleted`() {
-        val created  = userLens(postUser())
+        val created  = userResponseLens(postUser())
         val response = app(Request(DELETE, "/users/${created.id}"))
 
         assertEquals(NO_CONTENT, response.status)

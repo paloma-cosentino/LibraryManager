@@ -34,7 +34,12 @@ fun main() {
     val userService    = UserService(userRepository)
     val userHandler    = UserHandler(userService)
 
-    val publicRoutes    = loginRoutes(userHandler)
+    val uiHandler = UiHandler()
+
+    val publicRoutes    = routes(
+        publicUserRoutes(userHandler),
+        uiRoutes(uiHandler)
+    )
     val protectedRoutes = routes(
         bookRoutes(bookHandler),
         authorRoutes(authorHandler),

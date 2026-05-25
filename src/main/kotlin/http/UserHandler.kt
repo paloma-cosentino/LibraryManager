@@ -4,6 +4,7 @@ import org.example.model.LoginResponse
 import org.example.model.PagedResult
 import org.example.model.User
 import org.example.model.UserFilter
+import org.example.model.UserResponse
 import org.example.service.IUserService
 import org.http4k.core.Body
 import org.http4k.core.HttpHandler
@@ -19,6 +20,7 @@ import org.http4k.routing.routes
 
 class UserHandler(private val service: IUserService) {
     private val userLens = Body.auto<User>().toLens()
+    private val userResponseLens = Body.auto<UserResponse>().toLens()
     private val loginRequestLens = Body.auto<LoginRequest>().toLens()
     private val loginResponseLens = Body.auto<LoginResponse>().toLens()
     private val idPath   = Path.int().of("id")
@@ -52,7 +54,8 @@ class UserHandler(private val service: IUserService) {
                 email = userLens(request).email,
                 password = userLens(request).passwordHash
             )
-            userLens(saved, Response.Companion(Status.OK))
+            val response = UserResponse(saved.id, saved.name, saved.email)
+            userResponseLens(response, Response.Companion(Status.OK))
         }
     }
 
@@ -82,11 +85,11 @@ class UserHandler(private val service: IUserService) {
 fun userRoutes(handler: UserHandler) = routes(
     "/users" bind GET to handler.getAll,
     "/users/email" bind GET to handler.getByEmail,
-    "/users" bind POST to handler.create,
     "/users/{id}" bind PUT to handler.update,
     "/users/{id}" bind DELETE to handler.delete,
 )
 
-fun loginRoutes(handler: UserHandler) = routes(
-    "/auth/login" bind POST to handler.login
+fun publicUserRoutes(handler: UserHandler) = routes(
+    "/auth/login" bind POST to handler.login,
+    "/users" bind POST to handler.create
 )
