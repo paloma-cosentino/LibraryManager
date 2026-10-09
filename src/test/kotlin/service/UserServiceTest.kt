@@ -132,6 +132,80 @@ class UserServiceTest {
         assertNull(result)
     }
 
+    // ─── updateUserProfile ───────────────────────────────────────────────────
+
+    @Test
+    fun `updateUserProfile changes name and email`() {
+        val added   = service.addUser("Alice", "alice@example.com", "senha123")
+        val updated = service.updateUserProfile(added.id, "Alice Updated", "updated@example.com")
+
+        assertNotNull(updated)
+        assertEquals("Alice Updated", updated.name)
+        assertEquals("updated@example.com", updated.email)
+    }
+
+    @Test
+    fun `updateUserProfile does not change passwordHash`() {
+        val added   = service.addUser("Alice", "alice@example.com", "senha123")
+        val updated = service.updateUserProfile(added.id, "Alice Updated", "updated@example.com")
+
+        assertNotNull(updated)
+        assertEquals(added.passwordHash, updated.passwordHash)
+    }
+
+    @Test
+    fun `updateUserProfile returns null when user does not exist`() {
+        assertNull(service.updateUserProfile(999, "Ghost", "ghost@example.com"))
+    }
+
+    // ─── changePassword ──────────────────────────────────────────────────────
+
+    @Test
+    fun `changePassword allows login with the new password`() {
+        val added = service.addUser("Alice", "alice@example.com", "senha123")
+
+        service.changePassword(added.id, "senha123", "novaSenha456")
+
+        val response = service.login("alice@example.com", "novaSenha456")
+        assertTrue(response.token.isNotBlank())
+    }
+
+    @Test
+    fun `changePassword rejects the old password after it was changed`() {
+        val added = service.addUser("Alice", "alice@example.com", "senha123")
+        service.changePassword(added.id, "senha123", "novaSenha456")
+
+        assertFailsWith<UserExceptions.InvalidCredentialsException> {
+            service.login("alice@example.com", "senha123")
+        }
+    }
+
+    @Test
+    fun `changePassword throws InvalidCredentialsException when current password is wrong`() {
+        val added = service.addUser("Alice", "alice@example.com", "senha123")
+
+        assertFailsWith<UserExceptions.InvalidCredentialsException> {
+            service.changePassword(added.id, "wrongPassword", "novaSenha456")
+        }
+    }
+
+    @Test
+    fun `changePassword throws UserIdNotFoundException when user does not exist`() {
+        assertFailsWith<UserExceptions.UserIdNotFoundException> {
+            service.changePassword(999, "whatever", "novaSenha456")
+        }
+    }
+
+    @Test
+    fun `changePassword stores a bcrypt hash not the plain new password`() {
+        val added = service.addUser("Alice", "alice@example.com", "senha123")
+        service.changePassword(added.id, "senha123", "novaSenha456")
+
+        val stored = service.getUserById(added.id)
+        assertNotEquals("novaSenha456", stored.passwordHash)
+        assertTrue(stored.passwordHash.startsWith("\$2a\$"))
+    }
+
     // ─── removeUser ──────────────────────────────────────────────────────────
 
     @Test

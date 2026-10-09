@@ -23,8 +23,8 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
         const alert = document.createElement("div");
         alert.className = "alert alert-error";
         alert.textContent = response.status === 401
-            ? "Email ou senha incorretos."
-            : "Erro ao fazer login. Tente novamente.";
+            ? "Incorrect email or password."
+            : "Error logging in. Please try again.";
 
         container.insertBefore(alert, container.querySelector("form"));
     }

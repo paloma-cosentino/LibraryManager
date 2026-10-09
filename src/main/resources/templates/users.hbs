@@ -1,0 +1,77 @@
+{{#> layout pageTitle="Users" isUsers=true}}
+<h2>👤 Users</h2>
+
+<div class="toolbar">
+    <input type="text" id="filterName" placeholder="Name">
+    <button type="button" onclick="applyFilters()">Search</button>
+</div>
+
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody id="usersBody">
+        <tr><td colspan="3" class="empty">Loading…</td></tr>
+    </tbody>
+</table>
+
+<div class="pagination">
+    <button type="button" id="prevPageBtn" onclick="changePage(-1)">« Prev</button>
+    <span id="pageIndicator">Page 1</span>
+    <button type="button" id="nextPageBtn" onclick="changePage(1)">Next »</button>
+</div>
+
+<div id="userModal" class="modal hidden">
+    <div class="modal-content">
+        <h3>Edit User</h3>
+        <form id="userForm">
+            <input type="hidden" id="userId">
+
+            <label for="name">Name</label>
+            <input type="text" id="name" required>
+
+            <label for="email">Email</label>
+            <input type="email" id="email" required>
+
+            <div id="userFormError" class="form-error"></div>
+
+            <div class="modal-actions">
+                <button type="button" class="btn-secondary" onclick="closeModal()">Cancel</button>
+                <button type="submit" class="btn-primary">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="passwordModal" class="modal hidden">
+    <div class="modal-content">
+        <h3>Change Password</h3>
+        <form id="passwordForm">
+            <input type="hidden" id="passwordUserId">
+
+            <label for="currentPassword">Current password</label>
+            <input type="password" id="currentPassword" required>
+
+            <label for="newPassword">New password</label>
+            <input type="password" id="newPassword" required minlength="4">
+
+            <label for="confirmPassword">Confirm new password</label>
+            <input type="password" id="confirmPassword" required minlength="4">
+
+            <div id="passwordFormError" class="form-error"></div>
+
+            <div class="modal-actions">
+                <button type="button" class="btn-secondary" onclick="closePasswordModal()">Cancel</button>
+                <button type="submit" class="btn-primary">Change Password</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script src="/static/js/users.js"></script>
+{{/layout}}
+

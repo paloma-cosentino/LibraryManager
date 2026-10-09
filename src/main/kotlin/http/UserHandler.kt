@@ -21,6 +21,8 @@ import org.http4k.routing.routes
 class UserHandler(private val service: IUserService) {
     private val userLens = Body.auto<User>().toLens()
     private val userResponseLens = Body.auto<UserResponse>().toLens()
+    private val updateUserRequestLens = Body.auto<UpdateUserRequest>().toLens()
+    private val changePasswordRequestLens = Body.auto<ChangePasswordRequest>().toLens()
     private val loginRequestLens = Body.auto<LoginRequest>().toLens()
     private val loginResponseLens = Body.auto<LoginResponse>().toLens()
     private val idPath   = Path.int().of("id")
@@ -30,7 +32,7 @@ class UserHandler(private val service: IUserService) {
     private val pageQuery = Query.int().defaulted("page", 1)
     private val sizeQuery = Query.int().defaulted("size", 10)
     
-    private val pagedUserLens = Body.auto<PagedResult<User>>().toLens()
+    private val pagedUserResponseLens = Body.auto<PagedResult<UserResponse>>().toLens()
     
     val getAll: HttpHandler = { request ->
         val filter = UserFilter(
@@ -38,12 +40,22 @@ class UserHandler(private val service: IUserService) {
             page = pageQuery(request).coerceAtLeast(1),
             size = sizeQuery(request).coerceIn(1, 100)
         )
-        pagedUserLens(service.getAllUsers(filter), Response.Companion(Status.OK))
+        val result = service.getAllUsers(filter)
+        // Never serialize the full User (and its passwordHash) over the wire.
+        val response = PagedResult(
+            data = result.data.map { UserResponse(it.id, it.name, it.email) },
+            page = result.page,
+            pageSize = result.pageSize,
+            total = result.total,
+            totalPages = result.totalPages
+        )
+        pagedUserResponseLens(response, Response.Companion(Status.OK))
     }
 
     val getByEmail: HttpHandler = { request ->
         handleUserExceptions {
-            userLens(service.getUserByEmail(emailQuery(request)), Response.Companion(Status.OK))
+            val user = service.getUserByEmail(emailQuery(request))
+            userResponseLens(UserResponse(user.id, user.name, user.email), Response.Companion(Status.OK))
         }
     }
 
@@ -61,9 +73,18 @@ class UserHandler(private val service: IUserService) {
 
     val update: HttpHandler = { request ->
         handleUserExceptions {
-            val updated = service.updateUser(userLens(request).copy(id = idPath(request)))
+            val body = updateUserRequestLens(request)
+            val updated = service.updateUserProfile(idPath(request), body.name, body.email)
             if (updated == null) Response.Companion(Status.NOT_FOUND)
-            else userLens(updated, Response.Companion(Status.OK))
+            else userResponseLens(UserResponse(updated.id, updated.name, updated.email), Response.Companion(Status.OK))
+        }
+    }
+
+    val changePassword: HttpHandler = { request ->
+        handleUserExceptions {
+            val body = changePasswordRequestLens(request)
+            service.changePassword(idPath(request), body.currentPassword, body.newPassword)
+            Response.Companion(Status.NO_CONTENT)
         }
     }
 
@@ -86,6 +107,7 @@ fun userRoutes(handler: UserHandler) = routes(
     "/users" bind GET to handler.getAll,
     "/users/email" bind GET to handler.getByEmail,
     "/users/{id}" bind PUT to handler.update,
+    "/users/{id}/password" bind PATCH to handler.changePassword,
     "/users/{id}" bind DELETE to handler.delete,
 )
 

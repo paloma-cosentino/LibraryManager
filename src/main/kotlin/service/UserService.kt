@@ -33,6 +33,28 @@ class UserService(private val repository: UserRepository): IUserService {
 
     override fun updateUser(user: User) = repository.update(user)
 
+    // Used by the HTTP layer: never accepts/touches passwordHash, so clients
+    // (and GET responses, which no longer expose the hash) don't need to
+    // know it just to rename a user or change their email.
+    override fun updateUserProfile(id: Int, name: String, email: String): User? {
+        val current = repository.findById(id) ?: return null
+        return repository.update(current.copy(name = name, email = email))
+    }
+
+    // Self-service password change: requires proving the current password,
+    // since this is reachable by any authenticated user for their own id.
+    override fun changePassword(id: Int, currentPassword: String, newPassword: String) {
+        val current = repository.findById(id)
+            ?: throw UserExceptions.UserIdNotFoundException(id)
+
+        if (!BCrypt.checkpw(currentPassword, current.passwordHash)) {
+            throw UserExceptions.InvalidCredentialsException()
+        }
+
+        val newHash = BCrypt.hashpw(newPassword, BCrypt.gensalt())
+        repository.update(current.copy(passwordHash = newHash))
+    }
+
     override fun removeUser(id: Int) = repository.delete(id)
 
     override fun login(email: String, password: String): LoginResponse {

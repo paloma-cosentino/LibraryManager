@@ -2,7 +2,6 @@ package org.example.http
 
 import org.example.model.LoginResponse
 import org.example.model.PagedResult
-import org.example.model.User
 import org.example.model.UserResponse
 import org.example.repository.InMemoryUserRepository
 import org.example.service.UserService
@@ -23,9 +22,8 @@ class UserHandlerTest {
 
     private lateinit var app: HttpHandler
     private lateinit var authApp: HttpHandler
-    private val userLens          = Body.auto<User>().toLens()
     private val userResponseLens  = Body.auto<UserResponse>().toLens()
-    private val pagedUsersLens    = Body.auto<PagedResult<User>>().toLens()
+    private val pagedUsersLens    = Body.auto<PagedResult<UserResponse>>().toLens()
     private val loginResponseLens = Body.auto<LoginResponse>().toLens()
 
     @BeforeTest
@@ -88,6 +86,15 @@ class UserHandlerTest {
         assertEquals("Alice", users.first().name)
     }
 
+    @Test
+    fun `GET users never exposes passwordHash in the response body`() {
+        postUser("Alice", "alice@example.com", "senha123")
+
+        val response = app(Request(GET, "/users"))
+
+        assertFalse(response.bodyString().contains("passwordHash"))
+    }
+
     // ─── GET /users/email ─────────────────────────────────────────────────────
 
     @Test
@@ -97,7 +104,16 @@ class UserHandlerTest {
         val response = app(Request(GET, "/users/email?email=alice@example.com"))
 
         assertEquals(OK, response.status)
-        assertEquals("alice@example.com", userLens(response).email)
+        assertEquals("alice@example.com", userResponseLens(response).email)
+    }
+
+    @Test
+    fun `GET users by email never exposes passwordHash in the response body`() {
+        postUser("Alice", "alice@example.com", "senha123")
+
+        val response = app(Request(GET, "/users/email?email=alice@example.com"))
+
+        assertFalse(response.bodyString().contains("passwordHash"))
     }
 
     @Test
@@ -142,13 +158,39 @@ class UserHandlerTest {
         val response = app(
             Request(PUT, "/users/${created.id}")
                 .header("Content-Type", "application/json")
-                .body("""{"id":0,"name":"Alice Updated","email":"updated@example.com","passwordHash":""}""")
+                .body("""{"name":"Alice Updated","email":"updated@example.com"}""")
         )
 
         assertEquals(OK, response.status)
-        val updated = userLens(response)
+        val updated = userResponseLens(response)
         assertEquals("Alice Updated", updated.name)
         assertEquals("updated@example.com", updated.email)
+    }
+
+    @Test
+    fun `PUT users never exposes passwordHash in the response body`() {
+        val created  = userResponseLens(postUser())
+        val response = app(
+            Request(PUT, "/users/${created.id}")
+                .header("Content-Type", "application/json")
+                .body("""{"name":"Alice Updated","email":"updated@example.com"}""")
+        )
+
+        assertFalse(response.bodyString().contains("passwordHash"))
+    }
+
+    @Test
+    fun `PUT users does not change the password`() {
+        val created = userResponseLens(postUser("Alice", "alice@example.com", "senha123"))
+        app(
+            Request(PUT, "/users/${created.id}")
+                .header("Content-Type", "application/json")
+                .body("""{"name":"Alice Updated","email":"alice@example.com"}""")
+        )
+
+        val response = postLogin("alice@example.com", "senha123")
+
+        assertEquals(OK, response.status)
     }
 
     @Test
@@ -156,7 +198,47 @@ class UserHandlerTest {
         val response = app(
             Request(PUT, "/users/999")
                 .header("Content-Type", "application/json")
-                .body("""{"id":0,"name":"Ghost","email":"ghost@example.com","passwordHash":""}""")
+                .body("""{"name":"Ghost","email":"ghost@example.com"}""")
+        )
+
+        assertEquals(NOT_FOUND, response.status)
+    }
+
+    // ─── PATCH /users/{id}/password ───────────────────────────────────────────
+
+    @Test
+    fun `PATCH users password returns 204 and allows login with the new password`() {
+        val created = userResponseLens(postUser("Alice", "alice@example.com", "senha123"))
+
+        val changeResponse = app(
+            Request(PATCH, "/users/${created.id}/password")
+                .header("Content-Type", "application/json")
+                .body("""{"currentPassword":"senha123","newPassword":"novaSenha456"}""")
+        )
+
+        assertEquals(NO_CONTENT, changeResponse.status)
+        assertEquals(OK, postLogin("alice@example.com", "novaSenha456").status)
+    }
+
+    @Test
+    fun `PATCH users password returns 401 when current password is wrong`() {
+        val created = userResponseLens(postUser("Alice", "alice@example.com", "senha123"))
+
+        val response = app(
+            Request(PATCH, "/users/${created.id}/password")
+                .header("Content-Type", "application/json")
+                .body("""{"currentPassword":"wrongPassword","newPassword":"novaSenha456"}""")
+        )
+
+        assertEquals(UNAUTHORIZED, response.status)
+    }
+
+    @Test
+    fun `PATCH users password returns 404 when user does not exist`() {
+        val response = app(
+            Request(PATCH, "/users/999/password")
+                .header("Content-Type", "application/json")
+                .body("""{"currentPassword":"whatever","newPassword":"novaSenha456"}""")
         )
 
         assertEquals(NOT_FOUND, response.status)

@@ -1,10 +1,13 @@
 <nav class="navbar">
     <div class="navbar-brand">📚 LibraryManager</div>
     <div class="navbar-links">
-        <a href="/ui/books">Livros</a>
-        <a href="/ui/authors">Autores</a>
-        <a href="/ui/loans">Empréstimos</a>
-        <a href="#" onclick="logout()">Sair</a>
+        <a href="/ui/books" class="{{#if isBooks}}active{{/if}}">Books</a>
+        <a href="/ui/authors" class="{{#if isAuthors}}active{{/if}}">Authors</a>
+        <a href="/ui/loans" class="{{#if isLoans}}active{{/if}}">Loans</a>
+        <a href="/ui/users" class="{{#if isUsers}}active{{/if}}">Users</a>
+        <a href="#" onclick="logout()">Logout</a>
     </div>
 </nav>
+
+
 

@@ -1,6 +1,6 @@
 # LibraryManager
 
-A Kotlin study project to build a **library inventory manager** with a REST API, user authentication, and a planned web UI.
+A Kotlin study project to build a **library inventory manager** with a REST API, user authentication, and a server-rendered web UI.
 
 ## Overview
 
@@ -15,22 +15,25 @@ The project follows a layered architecture (model → repository → service →
 - **Books** — full CRUD (`GET`, `POST`, `PUT`, `DELETE`) with category validation and author auto-creation
 - **Authors** — full CRUD
 - **Loans** — create loan (borrow), list, get by id, register return; tracks availability and overdue status
-- **Users** — create, list, get by email, update, delete, with BCrypt password hashing
-- **Authentication** — `POST /auth/login` returns a signed JWT token; all routes except login, user registration and the UI login page are protected by `AuthFilter`
+- **Users** — create, list, get by email, update profile, change password (self-service, requires current password), delete
+- **Authentication** — `POST /auth/login` returns a signed JWT token; all REST data endpoints are protected by `AuthFilter`
 - **Pagination** — all list endpoints support `page` and `size` query params
 - **Filtering** — books by title/category/author, authors by name, loans by borrower/bookId/active status, users by name
-- **Web UI (partial)** — login page served with Handlebars (`GET /ui/login`) and static CSS/JS assets (`GET /static/*`); client-side JS stores the JWT and attaches it to API calls
-- **Unit tests** — handler, service and SQLite repository tests for all entities
+- **Web UI** — full set of Handlebars-rendered pages (`/ui/login`, `/ui/books`, `/ui/authors`, `/ui/loans`, `/ui/users`), each with search, pagination, and create/edit/delete actions wired to the REST API via vanilla JS (`static/js/*.js`); the JWT is stored in `localStorage` and attached automatically to every API call
+- **Unit tests** — handler, service and SQLite repository tests for all entities (206 tests)
 
-### 🔲 Planned
+### 🔲 Known follow-ups
 
-- Remaining UI pages: books, authors, loans listing/management (see `TODOLIST.md` and `UI_GUIDE.md`)
+See [UI_GUIDE.md](UI_GUIDE.md#known-limitations--follow-ups-worth-doing-next) for details:
+
+- No self-service sign-up page (`POST /users` is API-only for now)
+- Loan creation loads all books into a single `<select>` (fine for a small catalog, not paginated)
 
 ---
 
 ## Authentication
 
-All endpoints except `POST /users`, `POST /auth/login`, `GET /ui/login` and `GET /static/*` require a valid JWT token.
+All endpoints except `POST /users`, `POST /auth/login` and the `/ui/*` + `/static/*` web pages require a valid JWT token.
 
 **Register a user:**
 ```http
@@ -82,9 +85,10 @@ Authorization: Bearer eyJ...
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
 | POST | `/users` | ❌ | Create user |
-| GET | `/users` | ✅ | List users (paginated, filter by `name`) |
-| GET | `/users/email?email=` | ✅ | Get user by email |
-| PUT | `/users/{id}` | ✅ | Update user |
+| GET | `/users` | ✅ | List users (paginated, filter by `name`) — returns `UserResponse` (no password hash) |
+| GET | `/users/email?email=` | ✅ | Get user by email — returns `UserResponse` |
+| PUT | `/users/{id}` | ✅ | Update user's name/email (`UpdateUserRequest`) |
+| PATCH | `/users/{id}/password` | ✅ | Change password; requires the current password (`ChangePasswordRequest`) |
 | DELETE | `/users/{id}` | ✅ | Delete user |
 
 ### Books
@@ -116,8 +120,14 @@ Authorization: Bearer eyJ...
 ### Web UI
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| GET | `/ui/login` | ❌ | Renders the login page (Handlebars) |
+| GET | `/ui/login` | ❌ | Login page |
+| GET | `/ui/books` | ❌* | Books list/search/create/edit/delete |
+| GET | `/ui/authors` | ❌* | Authors list/search/create/edit/delete |
+| GET | `/ui/loans` | ❌* | Loans list/search, borrow form, return action |
+| GET | `/ui/users` | ❌* | Users list/search/edit/delete, plus self-service change password |
 | GET | `/static/*` | ❌ | Serves static CSS/JS assets |
+
+> \* The HTML shell itself isn't behind `AuthFilter` (a plain browser navigation never sends the `Authorization` header — see `UI_GUIDE.md`), but each page's JS calls `requireAuth()` on load and all of its data comes from the already-protected REST endpoints above.
 
 ### Valid Book Categories
 `Fiction`, `Non-Fiction`, `Science Fiction`, `Fantasy`, `Horror`, `Mystery`, `Biography`, `History`, `Science`, `Technology`
@@ -163,12 +173,14 @@ LibraryManager/
     │   │   │   ├── AuthorHandler.kt            # Author handler + authorRoutes
     │   │   │   ├── BookRequest.kt
     │   │   │   ├── BookRoutes.kt               # Book handler + bookRoutes
+    │   │   │   ├── ChangePasswordRequest.kt
     │   │   │   ├── HandlerUtils.kt
     │   │   │   ├── LoanRequest.kt
     │   │   │   ├── LoanRoutes.kt               # Loan handler + loanRoutes
     │   │   │   ├── LoginRequest.kt
     │   │   │   ├── UiHandler.kt                # Renders Handlebars templates (login)
     │   │   │   ├── UiRoutes.kt                 # /ui/login and /static/* routes
+    │   │   │   ├── UpdateUserRequest.kt
     │   │   │   └── UserHandler.kt              # User handler + userRoutes/publicUserRoutes
     │   │   ├── model/
     │   │   │   ├── Author.kt
@@ -209,16 +221,24 @@ LibraryManager/
     │   │       └── UserService.kt
     │   └── resources/
     │       ├── templates/                      # Handlebars templates (UI)
-    │       │   ├── layout.hbs
-    │       │   ├── header.hbs
-    │       │   ├── footer.hbs
-    │       │   └── login.hbs
+    │       │   ├── layout.hbs                       # base layout (partial-block pattern)
+    │       │   ├── header.hbs                       # navbar partial (active-link state)
+    │       │   ├── footer.hbs                       # shared api.js include
+    │       │   ├── login.hbs
+    │       │   ├── books.hbs
+    │       │   ├── authors.hbs
+    │       │   ├── loans.hbs
+    │       │   └── users.hbs
     │       └── static/
     │           ├── css/
     │           │   └── style.css
     │           └── js/
-    │               ├── api.js
-    │               └── login.js
+    │               ├── api.js                       # apiFetch, qs, escapeHtml, requireAuth, logout
+    │               ├── login.js
+    │               ├── books.js
+    │               ├── authors.js
+    │               ├── loans.js
+    │               └── users.js
     └── test/kotlin/
         ├── http/
         │   ├── AuthorHandlerTest.kt

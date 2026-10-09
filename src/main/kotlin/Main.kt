@@ -10,8 +10,7 @@ import org.example.service.AuthorService
 import org.example.service.BookService
 import org.example.service.LoanService
 import org.example.service.UserService
-import org.http4k.core.Request
-import org.http4k.core.Status
+import org.http4k.core.Filter
 import org.http4k.routing.routes
 import org.http4k.server.Jetty
 import org.http4k.server.asServer
@@ -36,24 +35,33 @@ fun main() {
 
     val uiHandler = UiHandler()
 
-    val publicRoutes    = routes(
-        publicUserRoutes(userHandler),
-        uiRoutes(uiHandler)
-    )
+    // Scoped to this group only, so public routes that share a path with a
+    // protected one (e.g. POST /users vs GET /users) still resolve correctly
+    // (404/405) without ever running the filter.
     val protectedRoutes = routes(
         bookRoutes(bookHandler),
         authorRoutes(authorHandler),
         loanRoutes(loanHandler),
         userRoutes(userHandler)
-    )
+    ).withFilter(Filter(::authFilter))
 
-    val app = { request: Request ->
-        val publicResponse = publicRoutes(request)
-        if (publicResponse.status != Status.NOT_FOUND) publicResponse
-        else authFilter(protectedRoutes)(request)
-    }
+    // A single flat `routes()` call lets http4k resolve 404 vs 405 correctly
+    // across *all* registered routes, public and protected alike. Combining
+    // them via two separately-tried routers (checking only for 404) broke as
+    // soon as a path existed in both groups with different methods — e.g.
+    // POST /users (public) made GET /users (protected) return a bare 405
+    // instead of ever reaching the protected handler.
+    val app = routes(
+        publicUserRoutes(userHandler),
+        uiRoutes(uiHandler),
+        protectedRoutes
+    )
 
     app.asServer(Jetty(8080)).start()
 
     println("LibraryManager running on http://localhost:8080")
 }
+
+
+
+

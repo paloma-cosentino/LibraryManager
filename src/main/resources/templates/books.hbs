@@ -1,0 +1,80 @@
+{{#> layout pageTitle="Books" isBooks=true}}
+<h2>📚 Books</h2>
+
+<div class="toolbar">
+    <input type="text" id="filterTitle" placeholder="Title">
+    <input type="text" id="filterAuthor" placeholder="Author">
+    <select id="filterCategory">
+        <option value="">All categories</option>
+        {{#each categories}}
+        <option value="{{this}}">{{this}}</option>
+        {{/each}}
+    </select>
+    <button type="button" onclick="applyFilters()">Search</button>
+    <button type="button" class="btn-primary" onclick="openCreateModal()">+ Add Book</button>
+</div>
+
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>Title</th>
+            <th>Author</th>
+            <th>Category</th>
+            <th>Qty</th>
+            <th>Year</th>
+            <th>Edition</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody id="booksBody">
+        <tr><td colspan="7" class="empty">Loading…</td></tr>
+    </tbody>
+</table>
+
+<div class="pagination">
+    <button type="button" id="prevPageBtn" onclick="changePage(-1)">« Prev</button>
+    <span id="pageIndicator">Page 1</span>
+    <button type="button" id="nextPageBtn" onclick="changePage(1)">Next »</button>
+</div>
+
+<div id="bookModal" class="modal hidden">
+    <div class="modal-content">
+        <h3 id="modalTitle">Add Book</h3>
+        <form id="bookForm">
+            <input type="hidden" id="bookId">
+
+            <label for="title">Title</label>
+            <input type="text" id="title" required>
+
+            <label for="author">Author</label>
+            <input type="text" id="author" required>
+
+            <label for="category">Category</label>
+            <select id="category" required>
+                {{#each categories}}
+                <option value="{{this}}">{{this}}</option>
+                {{/each}}
+            </select>
+
+            <label for="quantity">Quantity</label>
+            <input type="number" id="quantity" min="0" required>
+
+            <label for="publishedYear">Published Year</label>
+            <input type="number" id="publishedYear">
+
+            <label for="edition">Edition</label>
+            <input type="text" id="edition">
+
+            <div id="bookFormError" class="form-error"></div>
+
+            <div class="modal-actions">
+                <button type="button" class="btn-secondary" onclick="closeModal()">Cancel</button>
+                <button type="submit" class="btn-primary">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script src="/static/js/books.js"></script>
+{{/layout}}
+
