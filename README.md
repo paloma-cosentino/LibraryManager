@@ -14,22 +14,23 @@ The project follows a layered architecture (model → repository → service →
 
 - **Books** — full CRUD (`GET`, `POST`, `PUT`, `DELETE`) with category validation and author auto-creation
 - **Authors** — full CRUD
-- **Loans** — create loan, list, get by id, register return; tracks availability and overdue status
-- **Users** — full CRUD with BCrypt password hashing
-- **Authentication** — `POST /auth/login` returns a signed JWT token; all routes except login are protected by `AuthFilter`
+- **Loans** — create loan (borrow), list, get by id, register return; tracks availability and overdue status
+- **Users** — create, list, get by email, update, delete, with BCrypt password hashing
+- **Authentication** — `POST /auth/login` returns a signed JWT token; all routes except login, user registration and the UI login page are protected by `AuthFilter`
 - **Pagination** — all list endpoints support `page` and `size` query params
-- **Filtering** — books by title/category/author, authors by name, loans by active status, users by name
+- **Filtering** — books by title/category/author, authors by name, loans by borrower/bookId/active status, users by name
+- **Web UI (partial)** — login page served with Handlebars (`GET /ui/login`) and static CSS/JS assets (`GET /static/*`); client-side JS stores the JWT and attaches it to API calls
 - **Unit tests** — handler, service and SQLite repository tests for all entities
 
 ### 🔲 Planned
 
-- Web UI with Handlebars templates and JavaScript (see `TODOLIST.md`)
+- Remaining UI pages: books, authors, loans listing/management (see `TODOLIST.md` and `UI_GUIDE.md`)
 
 ---
 
 ## Authentication
 
-All endpoints except `POST /users` and `POST /auth/login` require a valid JWT token.
+All endpoints except `POST /users`, `POST /auth/login`, `GET /ui/login` and `GET /static/*` require a valid JWT token.
 
 **Register a user:**
 ```http
@@ -89,9 +90,9 @@ Authorization: Bearer eyJ...
 ### Books
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| GET | `/books` | ✅ | List books (paginated, filter by `title`, `category`, `authorId`) |
+| GET | `/books` | ✅ | List books (paginated, filter by `title`, `category`, `author`) |
 | GET | `/books/{id}` | ✅ | Get book by id |
-| POST | `/books` | ✅ | Create book |
+| POST | `/books` | ✅ | Create book (auto-creates author if it doesn't exist) |
 | PUT | `/books/{id}` | ✅ | Update book |
 | DELETE | `/books/{id}` | ✅ | Delete book |
 
@@ -107,10 +108,16 @@ Authorization: Bearer eyJ...
 ### Loans
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| GET | `/loans` | ✅ | List loans (paginated, filter by `onlyActive`) |
+| GET | `/loans` | ✅ | List loans (paginated, filter by `borrower`, `bookId`, `onlyActive`) |
 | GET | `/loans/{id}` | ✅ | Get loan by id |
-| POST | `/loans` | ✅ | Create loan |
+| POST | `/loans` | ✅ | Borrow a book (creates a new loan) |
 | PATCH | `/loans/{id}/return` | ✅ | Register return |
+
+### Web UI
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| GET | `/ui/login` | ❌ | Renders the login page (Handlebars) |
+| GET | `/static/*` | ❌ | Serves static CSS/JS assets |
 
 ### Valid Book Categories
 `Fiction`, `Non-Fiction`, `Science Fiction`, `Fantasy`, `Horror`, `Mystery`, `Biography`, `History`, `Science`, `Technology`
@@ -127,6 +134,7 @@ Authorization: Bearer eyJ...
 | http4k-core | 5.35.0.0 | HTTP framework (functional, lenses) |
 | http4k-format-jackson | 5.35.0.0 | JSON serialization |
 | http4k-server-jetty | 5.35.0.0 | Embedded HTTP server |
+| http4k-template-handlebars | 5.35.0.0 | Server-side HTML templating (UI) |
 | Jetbrains Exposed | 0.57.0 | SQL DSL / ORM |
 | SQLite JDBC | 3.47.1.0 | Embedded database |
 | jbcrypt | 0.4 | Password hashing (BCrypt) |
@@ -141,63 +149,76 @@ Authorization: Bearer eyJ...
 LibraryManager/
 ├── library.db                              # SQLite database (auto-created on first run)
 └── src/
-    ├── main/kotlin/
-    │   ├── Main.kt                         # Entry point — starts HTTP server on :8080
-    │   ├── database/
-    │   │   ├── DatabaseFactory.kt
-    │   │   ├── AuthorTable.kt
-    │   │   ├── BookTable.kt
-    │   │   ├── LoanTable.kt
-    │   │   └── UserTable.kt
-    │   ├── http/
-    │   │   ├── AuthFilter.kt               # JWT middleware
-    │   │   ├── AuthorHandler.kt
-    │   │   ├── BookHandler.kt
-    │   │   ├── BookRequest.kt
-    │   │   ├── BookRoutes.kt
-    │   │   ├── HandlerUtils.kt
-    │   │   ├── LoanHandler.kt
-    │   │   ├── LoanRequest.kt
-    │   │   ├── LoanRoutes.kt
-    │   │   ├── LoginRequest.kt
-    │   │   └── UserHandler.kt
-    │   ├── model/
-    │   │   ├── Author.kt
-    │   │   ├── AuthorExceptions.kt
-    │   │   ├── AuthorFilter.kt
-    │   │   ├── Book.kt
-    │   │   ├── BookCategory.kt
-    │   │   ├── BookExceptions.kt
-    │   │   ├── BookFilter.kt
-    │   │   ├── Loan.kt
-    │   │   ├── LoanExceptions.kt
-    │   │   ├── LoanFilter.kt
-    │   │   ├── LoginResponse.kt
-    │   │   ├── PagedResult.kt
-    │   │   ├── User.kt
-    │   │   ├── UserExceptions.kt
-    │   │   ├── UserFilter.kt
-    │   │   └── UserResponse.kt
-    │   ├── repository/
-    │   │   ├── AuthorRepository.kt
-    │   │   ├── BookRepository.kt
-    │   │   ├── LoanRepository.kt
-    │   │   ├── SQLiteAuthorRepository.kt
-    │   │   ├── SQLiteBookRepository.kt
-    │   │   ├── SQLiteLoanRepository.kt
-    │   │   ├── SQLiteUserRepository.kt
-    │   │   └── UserRepository.kt
-    │   ├── security/
-    │   │   └── JwtService.kt               # JWT generation & validation
-    │   └── service/
-    │       ├── AuthorService.kt
-    │       ├── BookService.kt
-    │       ├── IAuthorService.kt
-    │       ├── IBookService.kt
-    │       ├── ILoanService.kt
-    │       ├── IUserService.kt
-    │       ├── LoanService.kt
-    │       └── UserService.kt
+    ├── main/
+    │   ├── kotlin/
+    │   │   ├── Main.kt                         # Entry point — starts HTTP server on :8080
+    │   │   ├── database/
+    │   │   │   ├── DatabaseFactory.kt
+    │   │   │   ├── AuthorTable.kt
+    │   │   │   ├── BookTable.kt
+    │   │   │   ├── LoanTable.kt
+    │   │   │   └── UserTable.kt
+    │   │   ├── http/
+    │   │   │   ├── AuthFilter.kt               # JWT middleware
+    │   │   │   ├── AuthorHandler.kt            # Author handler + authorRoutes
+    │   │   │   ├── BookRequest.kt
+    │   │   │   ├── BookRoutes.kt               # Book handler + bookRoutes
+    │   │   │   ├── HandlerUtils.kt
+    │   │   │   ├── LoanRequest.kt
+    │   │   │   ├── LoanRoutes.kt               # Loan handler + loanRoutes
+    │   │   │   ├── LoginRequest.kt
+    │   │   │   ├── UiHandler.kt                # Renders Handlebars templates (login)
+    │   │   │   ├── UiRoutes.kt                 # /ui/login and /static/* routes
+    │   │   │   └── UserHandler.kt              # User handler + userRoutes/publicUserRoutes
+    │   │   ├── model/
+    │   │   │   ├── Author.kt
+    │   │   │   ├── AuthorExceptions.kt
+    │   │   │   ├── AuthorFilter.kt
+    │   │   │   ├── Book.kt
+    │   │   │   ├── BookCategory.kt
+    │   │   │   ├── BookExceptions.kt
+    │   │   │   ├── BookFilter.kt
+    │   │   │   ├── Loan.kt
+    │   │   │   ├── LoanExceptions.kt
+    │   │   │   ├── LoanFilter.kt
+    │   │   │   ├── LoginResponse.kt
+    │   │   │   ├── PagedResult.kt
+    │   │   │   ├── User.kt
+    │   │   │   ├── UserExceptions.kt
+    │   │   │   ├── UserFilter.kt
+    │   │   │   └── UserResponse.kt
+    │   │   ├── repository/
+    │   │   │   ├── AuthorRepository.kt
+    │   │   │   ├── BookRepository.kt
+    │   │   │   ├── LoanRepository.kt
+    │   │   │   ├── SQLiteAuthorRepository.kt
+    │   │   │   ├── SQLiteBookRepository.kt
+    │   │   │   ├── SQLiteLoanRepository.kt
+    │   │   │   ├── SQLiteUserRepository.kt
+    │   │   │   └── UserRepository.kt
+    │   │   ├── security/
+    │   │   │   └── JwtService.kt               # JWT generation & validation
+    │   │   └── service/
+    │   │       ├── AuthorService.kt
+    │   │       ├── BookService.kt
+    │   │       ├── IAuthorService.kt
+    │   │       ├── IBookService.kt
+    │   │       ├── ILoanService.kt
+    │   │       ├── IUserService.kt
+    │   │       ├── LoanService.kt
+    │   │       └── UserService.kt
+    │   └── resources/
+    │       ├── templates/                      # Handlebars templates (UI)
+    │       │   ├── layout.hbs
+    │       │   ├── header.hbs
+    │       │   ├── footer.hbs
+    │       │   └── login.hbs
+    │       └── static/
+    │           ├── css/
+    │           │   └── style.css
+    │           └── js/
+    │               ├── api.js
+    │               └── login.js
     └── test/kotlin/
         ├── http/
         │   ├── AuthorHandlerTest.kt
@@ -216,6 +237,7 @@ LibraryManager/
         └── service/
             ├── AuthorServiceTest.kt
             ├── BookServiceTest.kt
+            ├── BookServiceExtensions.kt
             ├── LoanServiceTest.kt
             └── UserServiceTest.kt
 ```
