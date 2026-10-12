@@ -15,7 +15,6 @@ settings.gradle.kts
 TODOLIST.md
 ARCHITECTURE.md
 LOGIN_PLAN.md
-UI_GUIDE.md
 ### IntelliJ IDEA ###
 .idea
 .idea/modules.xml

@@ -298,6 +298,39 @@ $env:JWT_SECRET = "your-secret-key"
 
 ---
 
+## Running the Web UI Locally
+
+The web UI is served by the very same embedded server as the REST API — there's no separate frontend process, dev server, or build step to run.
+
+1. **Start the server** (see [How to Run](#how-to-run) above):
+   ```bash
+   export JWT_SECRET="your-secret-key"
+   ./gradlew run
+   ```
+   Wait for the `LibraryManager running on http://localhost:8080` line in the console.
+
+2. **Create a user.** There's no sign-up page yet (see [Known follow-ups](#-known-follow-ups)), so register your first account directly against the API, e.g. with `curl`:
+   ```bash
+   curl -X POST http://localhost:8080/users \
+     -H "Content-Type: application/json" \
+     -d '{"name":"Alice","email":"alice@example.com","passwordHash":"mypassword"}'
+   ```
+   (`passwordHash` here is just the request field name — send the plain password; the server hashes it with BCrypt before storing it.)
+
+3. **Open the login page** in your browser:
+   ```
+   http://localhost:8080/ui/login
+   ```
+   Sign in with the email/password you just registered. On success you're redirected to `/ui/books`.
+
+4. **Navigate the app** using the navbar — **Books**, **Authors**, **Loans**, **Users**. Every page supports search/filtering and pagination, with create/edit/delete handled through modals. The JWT is kept in the browser's `localStorage` and attached automatically to each API call; use the **Logout** link (or clear `localStorage`) to end the session.
+
+> 💡 Both Handlebars templates (`src/main/resources/templates/*.hbs`) and static JS/CSS (`src/main/resources/static/**`) are served straight from disk with hot-reload — editing them and refreshing the browser is enough to see changes, no server restart needed.
+
+See [UI_GUIDE.md](UI_GUIDE.md) for the full page-by-page implementation guide.
+
+---
+
 ## Contributing
 
 1. Fork the repository.
