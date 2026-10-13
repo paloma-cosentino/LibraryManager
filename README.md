@@ -4,6 +4,8 @@ A Kotlin study project to build a **library inventory manager** with a REST API,
 
 ## Overview
 
+**Status:** the REST API, JWT authentication and the web UI (login, books, authors, loans, users) are complete and covered by 206 passing tests. Remaining work is limited to minor follow-ups listed below.
+
 The project follows a layered architecture (model → repository → service → HTTP handler), with SQLite persistence, JWT-based authentication, and a comprehensive unit-test suite.
 
 ---
@@ -28,6 +30,8 @@ See [UI_GUIDE.md](UI_GUIDE.md#known-limitations--follow-ups-worth-doing-next) fo
 
 - No self-service sign-up page (`POST /users` is API-only for now)
 - Loan creation loads all books into a single `<select>` (fine for a small catalog, not paginated)
+- Pagination in the UI is simple Prev/Next (no numbered pages or page-size selector)
+
 
 ---
 
@@ -127,7 +131,7 @@ Authorization: Bearer eyJ...
 | GET | `/ui/users` | ❌* | Users list/search/edit/delete, plus self-service change password |
 | GET | `/static/*` | ❌ | Serves static CSS/JS assets |
 
-> \* The HTML shell itself isn't behind `AuthFilter` (a plain browser navigation never sends the `Authorization` header — see `UI_GUIDE.md`), but each page's JS calls `requireAuth()` on load and all of its data comes from the already-protected REST endpoints above.
+> \* The HTML shell itself isn't behind `AuthFilter` (a plain browser navigation never sends the `Authorization` header; see `UI_GUIDE.md`), but each page's JS calls `requireAuth()` on load and all of its data comes from the already-protected REST endpoints above.
 
 ### Valid Book Categories
 `Fiction`, `Non-Fiction`, `Science Fiction`, `Fantasy`, `Horror`, `Mystery`, `Biography`, `History`, `Science`, `Technology`
