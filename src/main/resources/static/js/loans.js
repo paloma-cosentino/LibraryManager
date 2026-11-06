@@ -48,7 +48,7 @@ function renderLoans(loans) {
         const tr = document.createElement("tr");
         tr.innerHTML = `
             <td>${escapeHtml(loan.book.title)}</td>
-            <td>${escapeHtml(loan.borrowerName)}</td>
+            <td>${escapeHtml(loan.borrower.name)}</td>
             <td>${loan.borrowedAt}</td>
             <td>${loan.dueDate}</td>
             <td>${statusBadge(loan)}</td>
@@ -124,7 +124,8 @@ document.getElementById("loanForm").addEventListener("submit", async (e) => {
 
     const payload = {
         bookId: parseInt(document.getElementById("bookId").value, 10),
-        borrowerName: document.getElementById("borrowerName").value,
+        // Loans are booked to the signed-in account.
+        userId: currentUser().id,
         daysToReturn: parseInt(document.getElementById("daysToReturn").value, 10)
     };
 

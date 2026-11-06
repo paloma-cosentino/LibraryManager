@@ -60,7 +60,7 @@ class LoanHandler(private val service: ILoanService) {
     val borrow: HttpHandler = { request: Request ->
         handleLoanExceptions {
             val body = loanRequestLens(request)
-            loanLens(service.borrowBook(body.bookId, body.borrowerName, body.daysToReturn), Response(CREATED))
+            loanLens(service.borrowBook(body.bookId, body.userId, body.daysToReturn), Response(CREATED))
         }
     }
 

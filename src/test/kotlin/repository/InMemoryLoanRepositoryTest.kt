@@ -3,6 +3,7 @@ package org.example.repository
 import org.example.model.Author
 import org.example.model.Book
 import org.example.model.BookCategory
+import org.example.model.Borrower
 import org.example.model.Loan
 import java.time.LocalDate
 import kotlin.test.*
@@ -14,7 +15,7 @@ class InMemoryLoanRepositoryTest {
 
     @Test
     fun `update increments version and stale update throws ConcurrentUpdateException`() {
-        val saved = repository.save(Loan(book = book, borrowerName = "Alice", borrowedAt = today, dueDate = today.plusDays(14)))
+        val saved = repository.save(Loan(book = book, borrower = Borrower(1, "Alice", "alice@example.com"), borrowedAt = today, dueDate = today.plusDays(14)))
 
         val updated = repository.update(saved.copy(returnedAt = today))
 

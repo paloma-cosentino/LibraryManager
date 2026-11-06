@@ -3,13 +3,16 @@ package org.example.repository
 import org.example.database.AuthorTable
 import org.example.database.BookTable
 import org.example.database.LoanTable
+import org.example.database.UserTable
 import org.example.model.Author
 import org.example.model.Book
 import org.example.model.BookCategory
+import org.example.model.Borrower
 import org.example.model.Loan
 import org.example.model.LoanFilter
 import org.example.model.PagedResult
 import org.jetbrains.exposed.sql.Database
+import org.jetbrains.exposed.sql.JoinType
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.andWhere
@@ -33,16 +36,21 @@ class SQLiteLoanRepository(private val database: Database) : LoanRepository{
             edition = this[BookTable.edition],
             version = this[BookTable.version]
         ),
-        borrowerName = this[LoanTable.borrowerName],
+        borrower = Borrower(this[UserTable.id], this[UserTable.name], this[UserTable.email]),
         borrowedAt = LocalDate.parse(this[LoanTable.borrowedAt]),
         dueDate = LocalDate.parse(this[LoanTable.dueDate]),
         returnedAt = this[LoanTable.returnedAt]?.let { LocalDate.parse(it) },
         version = this[LoanTable.version]
     )
-    override fun findAll(filter: LoanFilter): PagedResult<Loan> = transaction(database) {
-        var query = (LoanTable innerJoin BookTable innerJoin AuthorTable).selectAll()
 
-        filter.borrowerName?.let {query = query.andWhere { LoanTable.borrowerName like "%$it%" } } // Qual a diferença entre "%it%" e it
+    // Borrower columns only (never password_hash) are mapped from the joined users row.
+    private fun loansWithDetails() = (LoanTable innerJoin BookTable innerJoin AuthorTable)
+        .join(UserTable, JoinType.INNER, LoanTable.userId, UserTable.id)
+
+    override fun findAll(filter: LoanFilter): PagedResult<Loan> = transaction(database) {
+        var query = loansWithDetails().selectAll()
+
+        filter.borrowerName?.let { query = query.andWhere { UserTable.name like "%$it%" } }
         filter.bookId?.let { query = query.andWhere { LoanTable.bookId eq it } }
         if (filter.onlyActive) query = query.andWhere { LoanTable.returnedAt.isNull() }
 
@@ -63,7 +71,7 @@ class SQLiteLoanRepository(private val database: Database) : LoanRepository{
     }
 
     override fun findById(id: Int): Loan? = transaction(database) {
-        (LoanTable innerJoin BookTable innerJoin AuthorTable).selectAll()
+        loansWithDetails().selectAll()
             .where{ LoanTable.id eq id }
             .map { it.toLoan() }
             .firstOrNull()
@@ -73,7 +81,7 @@ class SQLiteLoanRepository(private val database: Database) : LoanRepository{
         loan.copy(
             id = LoanTable.insert {
                 it[bookId] = loan.book.id
-                it[borrowerName] = loan.borrowerName
+                it[userId] = loan.borrower.id
                 it[borrowedAt] = loan.borrowedAt.toString()
                 it[dueDate] = loan.dueDate.toString()
                 it[returnedAt] = loan.returnedAt?.toString()
@@ -87,7 +95,7 @@ class SQLiteLoanRepository(private val database: Database) : LoanRepository{
         val nextVersion = loan.version + 1
         val updatedRows = LoanTable.update({ (LoanTable.id eq loan.id) and (LoanTable.version eq loan.version) }) {
             it[bookId] = loan.book.id
-            it[borrowerName] = loan.borrowerName
+            it[userId] = loan.borrower.id
             it[borrowedAt] = loan.borrowedAt.toString()
             it[dueDate] = loan.dueDate.toString()
             it[returnedAt] = loan.returnedAt?.toString()

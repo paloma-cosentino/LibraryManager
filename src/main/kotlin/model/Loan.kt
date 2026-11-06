@@ -6,7 +6,7 @@ import java.time.temporal.ChronoUnit
 data class Loan(
     val id: Int = 0,
     val book: Book,
-    val borrowerName: String,       // stub — vira FK de User no futuro
+    val borrower: Borrower,
     val borrowedAt: LocalDate,
     val dueDate: LocalDate,
     val returnedAt: LocalDate? = null,

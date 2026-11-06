@@ -41,6 +41,7 @@ catch (e: LoanExceptions.BookNotAvailableException)   { Response(CONFLICT).body(
 catch (e: LoanExceptions.LoanAlreadyReturnedException){ Response(CONFLICT).body(e.message!!) }
 catch (e: ConcurrentUpdateException)                  { conflictAfterRetries(e) }
 catch (e: BookExceptions.BookNotFoundException)       { Response(NOT_FOUND).body(e.message!!) }
+catch (e: UserExceptions.UserIdNotFoundException)     { Response(NOT_FOUND).body(e.message!!) }
 catch (e: LensFailure)                                { Response(BAD_REQUEST).body(e.message ?: "Invalid request body")
 }
 

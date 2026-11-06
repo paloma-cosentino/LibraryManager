@@ -5,8 +5,10 @@ import org.example.model.Book
 import org.example.model.BookCategory
 import org.example.model.Loan
 import org.example.model.PagedResult
+import org.example.model.User
 import org.example.repository.InMemoryBookRepository
 import org.example.repository.InMemoryLoanRepository
+import org.example.repository.InMemoryUserRepository
 import org.example.service.LoanService
 import org.http4k.core.Body
 import org.http4k.core.HttpHandler
@@ -26,31 +28,38 @@ class LoanHandlerTest {
     private val loanLens       = Body.auto<Loan>().toLens()
     private val pagedLoansLens = Body.auto<PagedResult<Loan>>().toLens()
 
+    private lateinit var bookRepository: InMemoryBookRepository
     private lateinit var dune: Book
     private lateinit var foundation: Book
+    private lateinit var alice: User
+    private lateinit var bob: User
 
     @BeforeTest
     fun setUp() {
         val author = Author(1, "Frank Herbert")
         val asimov = Author(2, "Isaac Asimov")
 
-        val bookRepository = InMemoryBookRepository()
+        bookRepository = InMemoryBookRepository()
         dune       = bookRepository.save(Book(0, "Dune",       author, BookCategory.SCIENCE_FICTION, 2))
         foundation = bookRepository.save(Book(0, "Foundation", asimov, BookCategory.SCIENCE_FICTION, 1))
 
+        val userRepository = InMemoryUserRepository()
+        alice = userRepository.save(User(name = "Alice", email = "alice@example.com", passwordHash = "alice-secret-hash"))
+        bob   = userRepository.save(User(name = "Bob",   email = "bob@example.com",   passwordHash = "bob-secret-hash"))
+
         val loanRepository = InMemoryLoanRepository()
-        val service        = LoanService(bookRepository, loanRepository)
+        val service        = LoanService(bookRepository, loanRepository, userRepository)
         val handler        = LoanHandler(service)
         app = loanRoutes(handler).asActor(anAdmin)
     }
 
     // ─── helpers ─────────────────────────────────────────────────────────────
 
-    private fun postBorrow(bookId: Int = dune.id, borrower: String = "Alice", days: Int = 14) =
+    private fun postBorrow(bookId: Int = dune.id, userId: Int = alice.id, days: Int = 14) =
         app(
             Request(POST, "/loans")
                 .header("Content-Type", "application/json")
-                .body("""{"bookId":$bookId,"borrowerName":"$borrower","daysToReturn":$days}""")
+                .body("""{"bookId":$bookId,"userId":$userId,"daysToReturn":$days}""")
         )
 
     private fun patchReturn(loanId: Int) =
@@ -64,7 +73,7 @@ class LoanHandlerTest {
 
         assertEquals(CREATED, response.status)
         val loan = loanLens(response)
-        assertEquals("Alice", loan.borrowerName)
+        assertEquals("Alice", loan.borrower.name)
         assertEquals(dune.id, loan.book.id)
         assertNull(loan.returnedAt)
     }
@@ -88,8 +97,8 @@ class LoanHandlerTest {
     @Test
     fun `POST loans returns 409 when book has no available copies`() {
         // foundation has quantity=1
-        postBorrow(bookId = foundation.id, borrower = "Alice")
-        val response = postBorrow(bookId = foundation.id, borrower = "Bob")
+        postBorrow(bookId = foundation.id, userId = alice.id)
+        val response = postBorrow(bookId = foundation.id, userId = bob.id)
         assertEquals(CONFLICT, response.status)
     }
 
@@ -104,8 +113,8 @@ class LoanHandlerTest {
 
     @Test
     fun `GET loans returns all loans`() {
-        postBorrow(borrower = "Alice")
-        postBorrow(bookId = foundation.id, borrower = "Bob")
+        postBorrow(userId = alice.id)
+        postBorrow(bookId = foundation.id, userId = bob.id)
 
         val response = app(Request(GET, "/loans"))
         assertEquals(OK, response.status)
@@ -114,20 +123,20 @@ class LoanHandlerTest {
 
     @Test
     fun `GET loans filters by borrower name`() {
-        postBorrow(borrower = "Alice")
-        postBorrow(bookId = foundation.id, borrower = "Bob")
+        postBorrow(userId = alice.id)
+        postBorrow(bookId = foundation.id, userId = bob.id)
 
         val response = app(Request(GET, "/loans?borrower=Alice"))
         val loans    = pagedLoansLens(response).data
 
         assertEquals(1, loans.size)
-        assertEquals("Alice", loans.first().borrowerName)
+        assertEquals("Alice", loans.first().borrower.name)
     }
 
     @Test
     fun `GET loans filters by bookId`() {
-        postBorrow(bookId = dune.id,       borrower = "Alice")
-        postBorrow(bookId = foundation.id, borrower = "Bob")
+        postBorrow(bookId = dune.id,       userId = alice.id)
+        postBorrow(bookId = foundation.id, userId = bob.id)
 
         val response = app(Request(GET, "/loans?bookId=${foundation.id}"))
         val loans    = pagedLoansLens(response).data
@@ -138,15 +147,15 @@ class LoanHandlerTest {
 
     @Test
     fun `GET loans with onlyActive=true excludes returned loans`() {
-        val loan = loanLens(postBorrow(borrower = "Alice"))
-        postBorrow(bookId = foundation.id, borrower = "Bob")
+        val loan = loanLens(postBorrow(userId = alice.id))
+        postBorrow(bookId = foundation.id, userId = bob.id)
         patchReturn(loan.id)
 
         val response = app(Request(GET, "/loans?onlyActive=true"))
         val loans    = pagedLoansLens(response).data
 
         assertEquals(1, loans.size)
-        assertEquals("Bob", loans.first().borrowerName)
+        assertEquals("Bob", loans.first().borrower.name)
     }
 
     // ─── GET /loans/{id} ─────────────────────────────────────────────────────
@@ -191,5 +200,30 @@ class LoanHandlerTest {
     fun `PATCH loans return returns 404 when loan does not exist`() {
         val response = patchReturn(999)
         assertEquals(NOT_FOUND, response.status)
+    }
+
+    // ─── account-linked borrower ─────────────────────────────────────────────
+
+    @Test
+    fun `loan JSON carries borrower id, name and email and never the password hash`() {
+        val response = postBorrow(userId = alice.id)
+        val listed = app(Request(GET, "/loans"))
+
+        val borrower = Jackson.parse(response.bodyString())["borrower"]
+        assertEquals(alice.id, borrower["id"].intValue())
+        assertEquals("Alice", borrower["name"].textValue())
+        assertEquals("alice@example.com", borrower["email"].textValue())
+        listOf(response, listed).forEach {
+            assertFalse(it.bodyString().contains("passwordHash"))
+            assertFalse(it.bodyString().contains("alice-secret-hash"))
+        }
+    }
+
+    @Test
+    fun `POST loans returns 404 for an unknown user and leaves stock unchanged`() {
+        val response = postBorrow(userId = 999)
+
+        assertEquals(NOT_FOUND, response.status)
+        assertEquals(2, bookRepository.findById(dune.id)?.quantity)
     }
 }

@@ -25,11 +25,21 @@ object DatabaseMigrations {
     private fun versionDefinition(table: String) =
         "INT DEFAULT 0 NOT NULL CONSTRAINT chk_${table}_signed_integer_version CHECK (version BETWEEN -2147483648 AND 2147483647)"
 
+    // All steps run in one transaction: a refused or failed migration leaves the file exactly as it was.
     fun migrate(url: String) {
         DriverManager.getConnection(url).use { connection ->
-            // Explicitly, whatever the URL asked for: schema changes must never trip foreign-key checks.
+            // Explicitly, whatever the URL asked for, and before the transaction starts: SQLite ignores
+            // this pragma inside one. The loans rebuild drops and recreates a table with FKs.
             connection.createStatement().use { it.execute("PRAGMA foreign_keys = OFF") }
-            steps.forEach { connection.apply(it) }
+            connection.autoCommit = false
+            try {
+                steps.forEach { connection.apply(it) }
+                if (LoansUserIdMigration.isNeeded(connection)) LoansUserIdMigration.apply(connection)
+                connection.commit()
+            } catch (e: Exception) {
+                connection.rollback()
+                throw e
+            }
         }
     }
 

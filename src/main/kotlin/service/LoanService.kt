@@ -5,13 +5,17 @@ import org.example.model.Loan
 import org.example.model.LoanExceptions
 import org.example.model.LoanFilter
 import org.example.model.PagedResult
+import org.example.model.UserExceptions
+import org.example.model.toBorrower
 import org.example.repository.BookRepository
 import org.example.repository.LoanRepository
+import org.example.repository.UserRepository
 import java.time.LocalDate
 
 class LoanService(
     private val bookRepository: BookRepository,
-    private val loanRepository: LoanRepository
+    private val loanRepository: LoanRepository,
+    private val userRepository: UserRepository
 ): ILoanService {
     override fun getAllLoans(filter: LoanFilter): PagedResult<Loan> =
         loanRepository.findAll(filter)
@@ -21,7 +25,10 @@ class LoanService(
             ?: throw LoanExceptions.LoanNotFoundException(id)
     }
 
-    override fun borrowBook(bookId: Int, borrowerName: String, daysToReturn: Int): Loan {
+    override fun borrowBook(bookId: Int, userId: Int, daysToReturn: Int): Loan {
+        // Resolve the account before touching stock, so an unknown user can never cost a copy.
+        val borrower = userRepository.findById(userId)?.toBorrower()
+            ?: throw UserExceptions.UserIdNotFoundException(userId)
         val book = findBook(bookId)
         retryOnConflict {
             // Re-read on every attempt: availability must be judged against the latest committed stock.
@@ -33,7 +40,7 @@ class LoanService(
 
         val loan = Loan(
             book = book,
-            borrowerName = borrowerName,
+            borrower = borrower,
             borrowedAt = LocalDate.now(),
             dueDate = LocalDate.now().plusDays(daysToReturn.toLong())
         )

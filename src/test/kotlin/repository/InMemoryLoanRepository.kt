@@ -12,7 +12,7 @@ class InMemoryLoanRepository : LoanRepository {
     override fun findAll(filter: LoanFilter): PagedResult<Loan> {
         var result = loans.values.toList()
 
-        filter.borrowerName?.let { result = result.filter { l -> l.borrowerName.contains(it, ignoreCase = true) } }
+        filter.borrowerName?.let { result = result.filter { l -> l.borrower.name.contains(it, ignoreCase = true) } }
         filter.bookId?.let       { result = result.filter { l -> l.book.id == it } }
         if (filter.onlyActive)   result = result.filter { !it.isReturned }
 

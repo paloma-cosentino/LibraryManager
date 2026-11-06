@@ -29,7 +29,7 @@ fun main() {
     val bookService    = BookService(bookRepository, authorRepository)
     val bookHandler    = BookHandler(bookService)
 
-    val loanService    = LoanService(bookRepository, loanRepository)
+    val loanService    = LoanService(bookRepository, loanRepository, userRepository)
     val loanHandler    = LoanHandler(loanService)
 
     val userService    = UserService(userRepository)

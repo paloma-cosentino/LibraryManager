@@ -8,7 +8,7 @@ class LoanTest {
     private val book = Book(1, "Dune", Author(1, "Frank Herbert"), BookCategory.SCIENCE_FICTION, 1)
 
     private fun loanDue(dueDate: LocalDate, returnedAt: LocalDate? = null) =
-        Loan(1, book, "Alice", today.minusDays(30), dueDate, returnedAt)
+        Loan(1, book, Borrower(1, "Alice", "alice@example.com"), today.minusDays(30), dueDate, returnedAt)
 
     @Test
     fun `daysOverdue counts days past the due date`() {
