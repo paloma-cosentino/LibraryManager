@@ -77,6 +77,10 @@ class SQLiteUserRepository(private val database: Database) : UserRepository {
         UserTable.update({ UserTable.id eq id }) { it[UserTable.role] = role.name } > 0
     }
 
+    override fun countByRole(role: Role): Int = transaction(database) {
+        UserTable.selectAll().where { UserTable.role eq role.name }.count().toInt()
+    }
+
     override fun delete(id: Int): Boolean = transaction(database) {
         UserTable.deleteWhere { UserTable.id eq id } > 0
     }

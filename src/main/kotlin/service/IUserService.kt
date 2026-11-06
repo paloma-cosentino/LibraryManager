@@ -3,6 +3,7 @@ package org.example.service
 import org.example.model.Actor
 import org.example.model.LoginResponse
 import org.example.model.PagedResult
+import org.example.model.Role
 import org.example.model.User
 import org.example.model.UserFilter
 
@@ -20,5 +21,6 @@ interface IUserService {
     @Suppress("unused")
     fun changePassword(actor: Actor, id: Int, currentPassword: String, newPassword: String)
     fun removeUser(id: Int): Boolean
+    fun changeRole(id: Int, role: Role): User
     fun login(email: String, password: String): LoginResponse
 }

@@ -49,6 +49,7 @@ fun handleUserExceptions(block: () -> Response): Response = try {
 } catch (e: UserExceptions.UserIdNotFoundException)      { Response(NOT_FOUND).body(e.message!!) }
 catch (e: UserExceptions.UserEmailNotFoundException)   { Response(NOT_FOUND).body(e.message!!) }
 catch (e: UserExceptions.DuplicateUserException)       { Response(CONFLICT).body(e.message!!) }
+catch (e: UserExceptions.LastAdminException)           { Response(CONFLICT).body(e.message!!) }
 catch (e: UserExceptions.InvalidCredentialsException) { Response(UNAUTHORIZED).body(e.message!!) }
 catch (e: AuthorizationExceptions.ForbiddenException) { forbidden(e) }
 catch (e: LensFailure)                                 { Response(BAD_REQUEST).body(e.message ?: "Invalid request body") }

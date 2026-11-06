@@ -34,4 +34,14 @@ class InMemoryUserRepositoryTest {
     fun `updateRole returns false when user does not exist`() {
         assertFalse(repository.updateRole(999, Role.ADMIN))
     }
+
+    @Test
+    fun `countByRole counts only users with that role`() {
+        repository.save(User(name = "A", email = "a@example.com", passwordHash = "h", role = Role.ADMIN))
+        repository.save(User(name = "B", email = "b@example.com", passwordHash = "h", role = Role.ADMIN))
+        repository.save(User(name = "C", email = "c@example.com", passwordHash = "h"))
+
+        assertEquals(2, repository.countByRole(Role.ADMIN))
+        assertEquals(1, repository.countByRole(Role.USER))
+    }
 }

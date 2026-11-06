@@ -25,6 +25,7 @@ class UserHandler(private val service: IUserService) {
     private val userResponseLens = Body.auto<UserResponse>().toLens()
     private val updateUserRequestLens = Body.auto<UpdateUserRequest>().toLens()
     private val changePasswordRequestLens = Body.auto<ChangePasswordRequest>().toLens()
+    private val roleChangeRequestLens = Body.auto<RoleChangeRequest>().toLens()
     private val loginRequestLens = Body.auto<LoginRequest>().toLens()
     private val loginResponseLens = Body.auto<LoginResponse>().toLens()
     private val idPath   = Path.int().of("id")
@@ -90,6 +91,13 @@ class UserHandler(private val service: IUserService) {
         }
     }
 
+    val changeRole: HttpHandler = { request ->
+        handleUserExceptions {
+            val body = roleChangeRequestLens(request)
+            userResponseLens(service.changeRole(idPath(request), body.role).toResponse(), Response(Status.OK))
+        }
+    }
+
     val delete: HttpHandler = { request ->
         handleUserExceptions {
             if (service.removeUser(idPath(request))) Response.Companion(Status.NO_CONTENT)
@@ -119,6 +127,7 @@ fun userRoutes(handler: UserHandler) = routes(
     "/users/email" bind GET to handler.getByEmail,
     "/users/{id}" bind PUT to handler.update,
     "/users/{id}/password" bind PATCH to handler.changePassword,
+    "/users/{id}/role" bind PATCH to requireAdmin.then(handler.changeRole),
     "/users/{id}" bind DELETE to requireAdmin.then(handler.delete),
 )
 

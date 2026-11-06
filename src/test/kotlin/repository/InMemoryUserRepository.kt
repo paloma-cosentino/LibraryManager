@@ -48,6 +48,8 @@ class InMemoryUserRepository : UserRepository {
         return true
     }
 
+    override fun countByRole(role: Role): Int = users.values.count { it.role == role }
+
     override fun delete(id: Int): Boolean = users.remove(id) != null
 }
 

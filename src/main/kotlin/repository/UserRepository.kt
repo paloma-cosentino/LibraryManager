@@ -14,6 +14,7 @@ interface UserRepository {
     fun update(user: User): User?
     /** Returns true when a row was updated. */
     fun updateRole(id: Int, role: Role): Boolean
+    fun countByRole(role: Role): Int
     fun delete(id: Int): Boolean
 
 }

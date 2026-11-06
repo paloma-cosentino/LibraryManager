@@ -71,7 +71,49 @@ class UserService(private val repository: UserRepository): IUserService {
         repository.update(current.copy(passwordHash = newHash))
     }
 
-    override fun removeUser(id: Int) = repository.delete(id)
+    // An ADMIN is first demoted through the last-admin guard, so deleting admins is covered by the
+    // same invariant as demoting them. If the delete then fails, the demotion is undone.
+    override fun removeUser(id: Int): Boolean {
+        val target = repository.findById(id) ?: return false
+        if (target.role != Role.ADMIN) return repository.delete(id)
+        if (!demoteKeepingAnAdmin(id)) return false
+        val deleted = try {
+            repository.delete(id)
+        } catch (e: Exception) {
+            repository.updateRole(id, Role.ADMIN)
+            throw e
+        }
+        if (!deleted) repository.updateRole(id, Role.ADMIN)
+        return deleted
+    }
+
+    override fun changeRole(id: Int, role: Role): User {
+        val target = getUserById(id)
+        when {
+            target.role == role -> return target
+            role == Role.ADMIN -> writeRole(id, Role.ADMIN)
+            else -> if (!demoteKeepingAnAdmin(id)) throw UserExceptions.UserIdNotFoundException(id)
+        }
+        return target.copy(role = role)
+    }
+
+    // Last-admin guard as write–verify–compensate, with no locks: demotions are the only writes
+    // that can break "at least one ADMIN", and compensation only ever adds an ADMIN back. So in
+    // every interleaving of concurrent demotions, whichever ones see zero admins after their own
+    // write undo it, and at least one admin remains. A loser may 409 spuriously, which is safe.
+    // Returns false when the user no longer exists.
+    private fun demoteKeepingAnAdmin(id: Int): Boolean {
+        if (!repository.updateRole(id, Role.USER)) return false
+        if (repository.countByRole(Role.ADMIN) == 0) {
+            repository.updateRole(id, Role.ADMIN)
+            throw UserExceptions.LastAdminException()
+        }
+        return true
+    }
+
+    private fun writeRole(id: Int, role: Role) {
+        if (!repository.updateRole(id, role)) throw UserExceptions.UserIdNotFoundException(id)
+    }
 
     // Startup bootstrap from ADMIN_EMAILS: only promotes existing accounts (exact email match),
     // never creates accounts and never demotes anyone, so rerunning it is harmless.
