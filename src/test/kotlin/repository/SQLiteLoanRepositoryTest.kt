@@ -253,4 +253,27 @@ class SQLiteLoanRepositoryTest {
             repository.findAll(LoanFilter(borrowerName = null, bookId = null, onlyActive = false)).data.map { it.borrower }
         )
     }
+
+    @Test
+    fun `findAll filters by exact userId`() {
+        val book = insertBook("Dune", insertAuthor("Frank Herbert"), quantity = 5)
+        insertLoan(book, borrower = "Al")
+        insertLoan(book, borrower = "Alice")
+
+        val result = repository.findAll(LoanFilter(borrowerName = null, bookId = null, onlyActive = false, userId = user("Al").id)).data
+
+        assertEquals(listOf(user("Al").id), result.map { it.borrower.id })
+    }
+
+    @Test
+    fun `findActiveByUserId returns only that account's unreturned loans`() {
+        val book = insertBook("Dune", insertAuthor("Frank Herbert"), quantity = 5)
+        val active = insertLoan(book, borrower = "Alice")
+        val returned = insertLoan(book, borrower = "Alice")
+        repository.update(returned.copy(returnedAt = LocalDate.now()))
+        insertLoan(book, borrower = "Bob")
+
+        assertEquals(listOf(active), repository.findActiveByUserId(user("Alice").id))
+        assertTrue(repository.findActiveByUserId(999).isEmpty())
+    }
 }

@@ -14,6 +14,7 @@ class InMemoryLoanRepository : LoanRepository {
 
         filter.borrowerName?.let { result = result.filter { l -> l.borrower.name.contains(it, ignoreCase = true) } }
         filter.bookId?.let       { result = result.filter { l -> l.book.id == it } }
+        filter.userId?.let       { result = result.filter { l -> l.borrower.id == it } }
         if (filter.onlyActive)   result = result.filter { !it.isReturned }
 
         val total      = result.size
@@ -27,6 +28,9 @@ class InMemoryLoanRepository : LoanRepository {
     }
 
     override fun findById(id: Int): Loan? = loans[id]
+
+    override fun findActiveByUserId(userId: Int): List<Loan> =
+        loans.values.filter { it.borrower.id == userId && !it.isReturned }.sortedBy { it.id }
 
     override fun save(loan: Loan): Loan {
         val newLoan = loan.copy(id = nextId++, version = 0)

@@ -1,5 +1,7 @@
 package org.example.service
 
+import org.example.model.Actor
+import org.example.model.AuthorizationExceptions
 import org.example.model.BookExceptions
 import org.example.model.Loan
 import org.example.model.LoanExceptions
@@ -17,18 +19,27 @@ class LoanService(
     private val loanRepository: LoanRepository,
     private val userRepository: UserRepository
 ): ILoanService {
-    override fun getAllLoans(filter: LoanFilter): PagedResult<Loan> =
-        loanRepository.findAll(filter)
+    // A USER's query is always pinned to their own account, whatever userId they asked for.
+    override fun getAllLoans(actor: Actor, filter: LoanFilter): PagedResult<Loan> =
+        loanRepository.findAll(if (actor.isAdmin) filter else filter.copy(userId = actor.userId))
 
-    override fun getLoanById(id: Int): Loan {
-        return loanRepository.findById(id)
-            ?: throw LoanExceptions.LoanNotFoundException(id)
+    override fun getLoanById(actor: Actor, id: Int): Loan {
+        val loan = loanRepository.findById(id) ?: throw LoanExceptions.LoanNotFoundException(id)
+        if (!actor.isAdmin && loan.borrower.id != actor.userId) throw AuthorizationExceptions.ForbiddenException()
+        return loan
     }
 
-    override fun borrowBook(bookId: Int, userId: Int, daysToReturn: Int): Loan {
+    override fun borrowBook(actor: Actor, bookId: Int, userId: Int?, daysToReturn: Int): Loan {
+        val borrowerId = userId ?: actor.userId
+        // Before the lookup, so a USER cannot probe which account ids exist.
+        if (!actor.isAdmin && borrowerId != actor.userId) throw AuthorizationExceptions.ForbiddenException()
         // Resolve the account before touching stock, so an unknown user can never cost a copy.
-        val borrower = userRepository.findById(userId)?.toBorrower()
-            ?: throw UserExceptions.UserIdNotFoundException(userId)
+        val borrower = userRepository.findById(borrowerId)?.toBorrower()
+            ?: throw UserExceptions.UserIdNotFoundException(borrowerId)
+        // Applies to whoever borrows on the account's behalf, admins included; checked before stock.
+        if (loanRepository.findActiveByUserId(borrower.id).any { it.isOverdue }) {
+            throw LoanExceptions.BorrowerHasOverdueLoansException()
+        }
         val book = findBook(bookId)
         retryOnConflict {
             // Re-read on every attempt: availability must be judged against the latest committed stock.

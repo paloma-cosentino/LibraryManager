@@ -51,6 +51,7 @@ class SQLiteLoanRepository(private val database: Database) : LoanRepository{
         var query = loansWithDetails().selectAll()
 
         filter.borrowerName?.let { query = query.andWhere { UserTable.name like "%$it%" } }
+        filter.userId?.let { query = query.andWhere { LoanTable.userId eq it } }
         filter.bookId?.let { query = query.andWhere { LoanTable.bookId eq it } }
         if (filter.onlyActive) query = query.andWhere { LoanTable.returnedAt.isNull() }
 
@@ -75,6 +76,13 @@ class SQLiteLoanRepository(private val database: Database) : LoanRepository{
             .where{ LoanTable.id eq id }
             .map { it.toLoan() }
             .firstOrNull()
+    }
+
+    override fun findActiveByUserId(userId: Int): List<Loan> = transaction(database) {
+        loansWithDetails().selectAll()
+            .where { (LoanTable.userId eq userId) and LoanTable.returnedAt.isNull() }
+            .orderBy(LoanTable.id)
+            .map { it.toLoan() }
     }
 
     override fun save(loan: Loan): Loan = transaction(database) {

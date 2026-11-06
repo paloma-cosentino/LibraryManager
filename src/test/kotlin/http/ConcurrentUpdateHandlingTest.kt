@@ -68,7 +68,7 @@ class ConcurrentUpdateHandlingTest {
     @Test
     fun `PATCH loan return returns 409 when conflicts exhaust retries`() {
         val storedLoans = InMemoryLoanRepository()
-        val loan = LoanService(storedBooks, storedLoans, users).borrowBook(book.id, alice.id, 14)
+        val loan = LoanService(storedBooks, storedLoans, users).borrowBook(anAdmin, book.id, alice.id, 14)
         val loanApp = loanRoutes(LoanHandler(LoanService(storedBooks, AlwaysConflictingLoanRepository(storedLoans), users))).asActor(anAdmin)
 
         val response = loanApp(Request(PATCH, "/loans/${loan.id}/return"))

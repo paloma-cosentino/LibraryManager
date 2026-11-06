@@ -25,6 +25,7 @@ import kotlin.test.*
 class LoanHandlerTest {
 
     private lateinit var app: HttpHandler
+    private lateinit var unscopedApp: HttpHandler
     private val loanLens       = Body.auto<Loan>().toLens()
     private val pagedLoansLens = Body.auto<PagedResult<Loan>>().toLens()
 
@@ -51,6 +52,7 @@ class LoanHandlerTest {
         val service        = LoanService(bookRepository, loanRepository, userRepository)
         val handler        = LoanHandler(service)
         app = loanRoutes(handler).asActor(anAdmin)
+        unscopedApp = loanRoutes(handler)
     }
 
     // ─── helpers ─────────────────────────────────────────────────────────────
@@ -225,5 +227,78 @@ class LoanHandlerTest {
 
         assertEquals(NOT_FOUND, response.status)
         assertEquals(2, bookRepository.findById(dune.id)?.quantity)
+    }
+
+    @Test
+    fun `GET loans filters by exact userId`() {
+        postBorrow(userId = alice.id)
+        postBorrow(bookId = foundation.id, userId = bob.id)
+
+        val loans = pagedLoansLens(app(Request(GET, "/loans?userId=${bob.id}"))).data
+
+        assertEquals(listOf(bob.id), loans.map { it.borrower.id })
+    }
+
+    // ─── borrowing as a USER ─────────────────────────────────────────────────
+
+    private fun borrowAs(actor: org.example.model.Actor, body: String) =
+        unscopedApp.asActor(actor)(Request(POST, "/loans").header("Content-Type", "application/json").body(body))
+
+    @Test
+    fun `USER borrowing without userId gets a loan in their own name`() {
+        val response = borrowAs(aUser.copy(userId = alice.id), """{"bookId":${dune.id},"daysToReturn":14}""")
+
+        assertEquals(CREATED, response.status)
+        assertEquals(alice.id, loanLens(response).borrower.id)
+    }
+
+    @Test
+    fun `USER borrowing for someone else gets 403 and stock is unchanged`() {
+        val response = borrowAs(aUser.copy(userId = alice.id), """{"bookId":${dune.id},"userId":${bob.id},"daysToReturn":14}""")
+
+        assertEquals(org.http4k.core.Status.FORBIDDEN, response.status)
+        assertEquals(2, bookRepository.findById(dune.id)?.quantity)
+    }
+
+    // ─── reading as a USER ───────────────────────────────────────────────────
+
+    @Test
+    fun `USER listing loans with another userId sees only their own`() {
+        postBorrow(userId = alice.id)
+        postBorrow(bookId = foundation.id, userId = bob.id)
+        val asAlice = unscopedApp.asActor(aUser.copy(userId = alice.id))
+
+        val loans = pagedLoansLens(asAlice(Request(GET, "/loans?userId=${bob.id}"))).data
+
+        assertEquals(listOf(alice.id), loans.map { it.borrower.id })
+    }
+
+    @Test
+    fun `USER getting someone else's loan gets 403`() {
+        val bobsLoan = loanLens(postBorrow(bookId = foundation.id, userId = bob.id))
+        val asAlice = unscopedApp.asActor(aUser.copy(userId = alice.id))
+
+        assertEquals(org.http4k.core.Status.FORBIDDEN, asAlice(Request(GET, "/loans/${bobsLoan.id}")).status)
+    }
+
+    @Test
+    fun `USER returning even their own loan gets 403 and nothing changes`() {
+        val loan = loanLens(postBorrow(bookId = foundation.id, userId = alice.id))
+        val asAlice = unscopedApp.asActor(aUser.copy(userId = alice.id))
+
+        assertEquals(org.http4k.core.Status.FORBIDDEN, asAlice(Request(PATCH, "/loans/${loan.id}/return")).status)
+
+        assertNull(loanLens(app(Request(GET, "/loans/${loan.id}"))).returnedAt)
+        assertEquals(0, bookRepository.findById(foundation.id)?.quantity)
+    }
+
+    @Test
+    fun `POST loans returns 409 while the borrower has an overdue loan`() {
+        postBorrow(userId = alice.id, days = -1)
+
+        val response = postBorrow(bookId = foundation.id, userId = alice.id)
+
+        assertEquals(CONFLICT, response.status)
+        assertEquals(1, bookRepository.findById(foundation.id)?.quantity)
     }
 }
