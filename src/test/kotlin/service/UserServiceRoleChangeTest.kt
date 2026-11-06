@@ -4,13 +4,14 @@ import org.example.model.Role
 import org.example.model.User
 import org.example.model.UserExceptions
 import org.example.repository.HookedUserRepository
+import org.example.repository.InMemoryLoanRepository
 import org.example.repository.InMemoryUserRepository
 import kotlin.test.*
 
 class UserServiceRoleChangeTest {
 
     private val repository = HookedUserRepository(InMemoryUserRepository())
-    private val service = UserService(repository)
+    private val service = UserService(repository, InMemoryLoanRepository())
 
     private fun save(name: String, role: Role) =
         repository.save(User(name = name, email = "$name@example.com", passwordHash = "h", role = role))

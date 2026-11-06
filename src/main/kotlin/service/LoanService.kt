@@ -11,6 +11,7 @@ import org.example.model.UserExceptions
 import org.example.model.toBorrower
 import org.example.repository.BookRepository
 import org.example.repository.LoanRepository
+import org.example.repository.ReferencedRowException
 import org.example.repository.UserRepository
 import java.time.LocalDate
 
@@ -55,7 +56,23 @@ class LoanService(
             borrowedAt = LocalDate.now(),
             dueDate = LocalDate.now().plusDays(daysToReturn.toLong())
         )
-        return loanRepository.save(loan)
+        return try {
+            loanRepository.save(loan)
+        } catch (e: ReferencedRowException) {
+            // The user or book was deleted after our checks; the FK refused the loan. Put the copy
+            // back (unless the book itself is gone) and report whichever row is missing.
+            restockIfBookExists(bookId)
+            if (userRepository.findById(borrowerId) == null) throw UserExceptions.UserIdNotFoundException(borrowerId)
+            if (bookRepository.findById(bookId) == null) throw BookExceptions.BookNotFoundException(bookId)
+            throw e
+        }
+    }
+
+    private fun restockIfBookExists(bookId: Int) {
+        retryOnConflict {
+            val current = bookRepository.findById(bookId) ?: return@retryOnConflict
+            bookRepository.update(current.withQuantityChangedBy(+1))
+        }
     }
 
     private fun findBook(bookId: Int) =

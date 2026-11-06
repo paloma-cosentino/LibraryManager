@@ -2,13 +2,14 @@ package org.example.service
 
 import org.example.model.Role
 import org.example.model.User
+import org.example.repository.InMemoryLoanRepository
 import org.example.repository.InMemoryUserRepository
 import kotlin.test.*
 
 class UserServiceAdminBootstrapTest {
 
     private val repository = InMemoryUserRepository()
-    private val service = UserService(repository)
+    private val service = UserService(repository, InMemoryLoanRepository())
 
     private fun user(email: String, role: Role = Role.USER) =
         repository.save(User(name = email.substringBefore('@'), email = email, passwordHash = "h", role = role))

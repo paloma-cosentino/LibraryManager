@@ -24,7 +24,7 @@ class ConcurrentUpdateHandlingTest {
     private val storedBooks = InMemoryBookRepository()
     private val book = storedBooks.save(Book(0, "Dune", Author(1, "Frank Herbert"), BookCategory.SCIENCE_FICTION, 2))
     private val conflictingBooks = AlwaysConflictingBookRepository(storedBooks)
-    private val bookApp = bookRoutes(BookHandler(BookService(conflictingBooks, InMemoryAuthorRepository()))).asActor(anAdmin)
+    private val bookApp = bookRoutes(BookHandler(BookService(conflictingBooks, InMemoryAuthorRepository(), InMemoryLoanRepository()))).asActor(anAdmin)
     private val users = InMemoryUserRepository()
     private val alice = users.save(User(name = "Alice", email = "alice@example.com", passwordHash = "h"))
 

@@ -32,6 +32,10 @@ class InMemoryLoanRepository : LoanRepository {
     override fun findActiveByUserId(userId: Int): List<Loan> =
         loans.values.filter { it.borrower.id == userId && !it.isReturned }.sortedBy { it.id }
 
+    override fun existsByUserId(userId: Int): Boolean = loans.values.any { it.borrower.id == userId }
+
+    override fun existsByBookId(bookId: Int): Boolean = loans.values.any { it.book.id == bookId }
+
     override fun save(loan: Loan): Loan {
         val newLoan = loan.copy(id = nextId++, version = 0)
         loans[newLoan.id] = newLoan

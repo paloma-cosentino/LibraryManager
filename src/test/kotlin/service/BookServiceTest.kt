@@ -6,6 +6,7 @@ import org.example.model.BookExceptions
 import org.example.model.AuthorFilter
 import org.example.repository.InMemoryAuthorRepository
 import org.example.repository.InMemoryBookRepository
+import org.example.repository.InMemoryLoanRepository
 import kotlin.test.*
 
 class BookServiceTest {
@@ -16,7 +17,7 @@ class BookServiceTest {
     @BeforeTest
     fun setUp() {
         authorRepository = InMemoryAuthorRepository()
-        service = BookService(InMemoryBookRepository(), authorRepository)
+        service = BookService(InMemoryBookRepository(), authorRepository, InMemoryLoanRepository())
     }
 
     // ─── getAllBooks ──────────────────────────────────────────────────────────

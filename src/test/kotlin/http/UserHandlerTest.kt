@@ -5,6 +5,7 @@ import org.example.model.LoginResponse
 import org.example.model.PagedResult
 import org.example.model.Role
 import org.example.model.UserResponse
+import org.example.repository.InMemoryLoanRepository
 import org.example.repository.InMemoryUserRepository
 import org.example.service.UserService
 import org.http4k.core.Body
@@ -35,7 +36,7 @@ class UserHandlerTest {
     @BeforeTest
     fun setUp() {
         repository = InMemoryUserRepository()
-        val service = UserService(repository)
+        val service = UserService(repository, InMemoryLoanRepository())
         val handler = UserHandler(service)
         val public  = publicUserRoutes(handler)
         val protected = userRoutes(handler)

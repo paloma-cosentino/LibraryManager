@@ -3,12 +3,13 @@ package org.example.service
 import org.example.repository.HookedBookRepository
 import org.example.repository.InMemoryAuthorRepository
 import org.example.repository.InMemoryBookRepository
+import org.example.repository.InMemoryLoanRepository
 import kotlin.test.*
 
 class BookServiceConcurrencyTest {
 
     private val bookRepository = HookedBookRepository(InMemoryBookRepository())
-    private val service = BookService(bookRepository, InMemoryAuthorRepository())
+    private val service = BookService(bookRepository, InMemoryAuthorRepository(), InMemoryLoanRepository())
 
     @Test
     fun `a borrow during an edit is not lost`() {

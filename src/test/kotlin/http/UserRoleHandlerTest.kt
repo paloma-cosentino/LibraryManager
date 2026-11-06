@@ -3,6 +3,7 @@ package org.example.http
 import org.example.model.Role
 import org.example.model.User
 import org.example.model.UserResponse
+import org.example.repository.InMemoryLoanRepository
 import org.example.repository.InMemoryUserRepository
 import org.example.service.UserService
 import org.http4k.core.Body
@@ -19,7 +20,7 @@ import kotlin.test.*
 class UserRoleHandlerTest {
 
     private val repository = InMemoryUserRepository()
-    private val routes = userRoutes(UserHandler(UserService(repository)))
+    private val routes = userRoutes(UserHandler(UserService(repository, InMemoryLoanRepository())))
     private val userResponseLens = Body.auto<UserResponse>().toLens()
     private val root = repository.save(User(name = "Root", email = "root@example.com", passwordHash = "h", role = Role.ADMIN))
     private val bob = repository.save(User(name = "Bob", email = "bob@example.com", passwordHash = "h"))

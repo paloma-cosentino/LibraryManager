@@ -25,4 +25,12 @@ class InMemoryBookRepositoryTest {
     fun `update returns null when book does not exist`() {
         assertNull(repository.update(Book(999, "Ghost Book", author, BookCategory.FICTION, 0)))
     }
+
+    @Test
+    fun `existsByAuthorId reports whether the author has any book`() {
+        repository.save(Book(0, "Clean Code", author, BookCategory.TECHNOLOGY, 3))
+
+        assertTrue(repository.existsByAuthorId(author.id))
+        assertFalse(repository.existsByAuthorId(author.id + 1))
+    }
 }

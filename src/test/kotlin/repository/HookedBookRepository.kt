@@ -18,4 +18,15 @@ class HookedBookRepository(private val delegate: BookRepository) : BookRepositor
         hook?.also { hook = null }?.invoke()
         return delegate.update(book)
     }
+
+    private var deleteHook: (() -> Unit)? = null
+
+    fun beforeNextDelete(hook: () -> Unit) {
+        deleteHook = hook
+    }
+
+    override fun delete(id: Int): Boolean {
+        deleteHook?.also { deleteHook = null }?.invoke()
+        return delegate.delete(id)
+    }
 }

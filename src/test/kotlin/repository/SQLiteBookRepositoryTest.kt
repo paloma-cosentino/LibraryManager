@@ -251,4 +251,14 @@ class SQLiteBookRepositoryTest {
         assertNull(repository.findById(book1.id))
         assertNotNull(repository.findById(book2.id))
     }
+
+    @Test
+    fun `existsByAuthorId reports whether the author has any book`() {
+        val robert = insertAuthor("Robert C. Martin")
+        val david  = insertAuthor("David Thomas")
+        repository.save(Book(0, "Clean Code", robert, BookCategory.TECHNOLOGY, 3))
+
+        assertTrue(repository.existsByAuthorId(robert.id))
+        assertFalse(repository.existsByAuthorId(david.id))
+    }
 }

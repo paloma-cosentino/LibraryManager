@@ -81,7 +81,7 @@ class SQLiteUserRepository(private val database: Database) : UserRepository {
         UserTable.selectAll().where { UserTable.role eq role.name }.count().toInt()
     }
 
-    override fun delete(id: Int): Boolean = transaction(database) {
-        UserTable.deleteWhere { UserTable.id eq id } > 0
+    override fun delete(id: Int): Boolean = translatingForeignKeyViolations("User", id) {
+        transaction(database) { UserTable.deleteWhere { UserTable.id eq id } > 0 }
     }
 }

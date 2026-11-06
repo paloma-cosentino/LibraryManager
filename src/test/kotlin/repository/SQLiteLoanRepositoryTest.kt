@@ -276,4 +276,19 @@ class SQLiteLoanRepositoryTest {
         assertEquals(listOf(active), repository.findActiveByUserId(user("Alice").id))
         assertTrue(repository.findActiveByUserId(999).isEmpty())
     }
+
+    @Test
+    fun `existsByUserId and existsByBookId count returned loans too`() {
+        val author = insertAuthor("Frank Herbert")
+        val dune = insertBook("Dune", author)
+        val emma = insertBook("Emma", author)
+        val loan = insertLoan(dune, borrower = "Alice")
+        repository.update(loan.copy(returnedAt = LocalDate.now()))
+        user("Bob")
+
+        assertTrue(repository.existsByUserId(user("Alice").id))
+        assertTrue(repository.existsByBookId(dune.id))
+        assertFalse(repository.existsByUserId(user("Bob").id))
+        assertFalse(repository.existsByBookId(emma.id))
+    }
 }

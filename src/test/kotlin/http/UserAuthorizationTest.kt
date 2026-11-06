@@ -1,6 +1,7 @@
 package org.example.http
 
 import org.example.model.User
+import org.example.repository.InMemoryLoanRepository
 import org.example.repository.InMemoryUserRepository
 import org.example.service.UserService
 import org.http4k.core.Method.*
@@ -13,7 +14,7 @@ import kotlin.test.*
 class UserAuthorizationTest {
 
     private val repository = InMemoryUserRepository()
-    private val handler = UserHandler(UserService(repository))
+    private val handler = UserHandler(UserService(repository, InMemoryLoanRepository()))
     private val routes = routes(publicUserRoutes(handler), userRoutes(handler))
     private val alice = repository.save(User(name = "Alice", email = "alice@example.com", passwordHash = "h"))
 

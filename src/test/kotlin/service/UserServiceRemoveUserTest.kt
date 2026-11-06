@@ -1,16 +1,24 @@
 package org.example.service
 
+import org.example.model.Author
+import org.example.model.Book
+import org.example.model.BookCategory
+import org.example.model.Loan
 import org.example.model.Role
 import org.example.model.User
 import org.example.model.UserExceptions
+import org.example.model.toBorrower
 import org.example.repository.HookedUserRepository
+import org.example.repository.InMemoryLoanRepository
 import org.example.repository.InMemoryUserRepository
+import java.time.LocalDate
 import kotlin.test.*
 
 class UserServiceRemoveUserTest {
 
     private val repository = HookedUserRepository(InMemoryUserRepository())
-    private val service = UserService(repository)
+    private val loanRepository = InMemoryLoanRepository()
+    private val service = UserService(repository, loanRepository)
 
     private fun save(name: String, role: Role) =
         repository.save(User(name = name, email = "$name@example.com", passwordHash = "h", role = role))
@@ -93,5 +101,45 @@ class UserServiceRemoveUserTest {
 
         assertFalse(service.removeUser(a.id))
         assertEquals(1, repository.countByRole(Role.ADMIN))
+    }
+
+    // ─── loans block deletion ────────────────────────────────────────────────
+
+    private val dune = Book(1, "Dune", Author(1, "Frank Herbert"), BookCategory.SCIENCE_FICTION, 1)
+
+    private fun lendTo(user: User, returned: Boolean = false) = loanRepository.save(
+        Loan(book = dune, borrower = user.toBorrower(), borrowedAt = LocalDate.now(), dueDate = LocalDate.now(),
+            returnedAt = if (returned) LocalDate.now() else null)
+    )
+
+    @Test
+    fun `a user with an active loan cannot be deleted`() {
+        save("root", Role.ADMIN)
+        val bob = save("bob", Role.USER)
+        lendTo(bob)
+
+        assertFailsWith<UserExceptions.UserHasLoansException> { service.removeUser(bob.id) }
+        assertEquals(bob, repository.findById(bob.id))
+    }
+
+    @Test
+    fun `a user whose loans are all returned still cannot be deleted`() {
+        save("root", Role.ADMIN)
+        val bob = save("bob", Role.USER)
+        lendTo(bob, returned = true)
+
+        assertFailsWith<UserExceptions.UserHasLoansException> { service.removeUser(bob.id) }
+        assertEquals(bob, repository.findById(bob.id))
+    }
+
+    @Test
+    fun `an admin with loans is refused before any demotion is attempted`() {
+        val a = save("a", Role.ADMIN)
+        save("b", Role.ADMIN)
+        lendTo(a)
+        repository.beforeNextRoleWrite { fail("no role write expected") }
+
+        assertFailsWith<UserExceptions.UserHasLoansException> { service.removeUser(a.id) }
+        assertEquals(a, repository.findById(a.id))
     }
 }

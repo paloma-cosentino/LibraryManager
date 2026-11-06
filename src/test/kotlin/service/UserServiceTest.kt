@@ -4,6 +4,7 @@ import org.example.model.Actor
 import org.example.model.Role
 import org.example.model.UserExceptions
 import org.example.model.UserFilter
+import org.example.repository.InMemoryLoanRepository
 import org.example.repository.InMemoryUserRepository
 import kotlin.test.*
 
@@ -15,7 +16,7 @@ class UserServiceTest {
 
     @BeforeTest
     fun setUp() {
-        service = UserService(InMemoryUserRepository())
+        service = UserService(InMemoryUserRepository(), InMemoryLoanRepository())
     }
 
     // ─── getAllUsers ──────────────────────────────────────────────────────────

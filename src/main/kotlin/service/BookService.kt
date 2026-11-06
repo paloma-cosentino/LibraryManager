@@ -8,10 +8,13 @@ import org.example.model.BookExceptions
 import org.example.model.PagedResult
 import org.example.repository.AuthorRepository
 import org.example.repository.BookRepository
+import org.example.repository.LoanRepository
+import org.example.repository.ReferencedRowException
 
 class BookService(
     private val bookRepository: BookRepository,
-    private val authorRepository: AuthorRepository
+    private val authorRepository: AuthorRepository,
+    private val loanRepository: LoanRepository
 ): IBookService {
     override fun getAllBooks(filter: BookFilter): PagedResult<Book> =
         bookRepository.findAll(filter)
@@ -78,7 +81,15 @@ class BookService(
             ?: throw BookExceptions.BookNotFoundException(id)
     }
 
-    override fun removeBook(id: Int): Boolean = bookRepository.delete(id)
+    // Any loan, returned or not, keeps the book; the FK catches a loan that races in after the check.
+    override fun removeBook(id: Int): Boolean {
+        if (loanRepository.existsByBookId(id)) throw BookExceptions.BookHasLoansException(id)
+        return try {
+            bookRepository.delete(id)
+        } catch (e: ReferencedRowException) {
+            throw BookExceptions.BookHasLoansException(id)
+        }
+    }
 
     private fun resolveAuthor(authorName: String) =
         authorRepository.findByName(authorName)

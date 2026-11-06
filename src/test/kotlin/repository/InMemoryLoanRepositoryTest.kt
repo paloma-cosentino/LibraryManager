@@ -44,4 +44,14 @@ class InMemoryLoanRepositoryTest {
 
         assertEquals(listOf(active), repository.findActiveByUserId(1))
     }
+
+    @Test
+    fun `existsByUserId and existsByBookId count returned loans too`() {
+        repository.save(Loan(book = book, borrower = Borrower(1, "Alice", "a@example.com"), borrowedAt = today, dueDate = today, returnedAt = today))
+
+        assertTrue(repository.existsByUserId(1))
+        assertTrue(repository.existsByBookId(book.id))
+        assertFalse(repository.existsByUserId(2))
+        assertFalse(repository.existsByBookId(book.id + 1))
+    }
 }

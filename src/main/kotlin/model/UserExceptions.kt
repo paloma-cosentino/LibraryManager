@@ -6,4 +6,5 @@ object UserExceptions {
     class DuplicateUserException(email: String) : IllegalArgumentException("User with email [$email] already exists")
     class InvalidCredentialsException : IllegalArgumentException("Invalid email or password")
     class LastAdminException : IllegalArgumentException("At least one admin must remain")
+    class UserHasLoansException(id: Int) : IllegalArgumentException("User [$id] has loans and cannot be deleted")
 }

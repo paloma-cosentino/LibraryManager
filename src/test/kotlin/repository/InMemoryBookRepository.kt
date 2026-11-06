@@ -46,4 +46,6 @@ class InMemoryBookRepository : BookRepository {
     override fun delete(id: Int): Boolean {
         return books.remove(id) != null
     }
+
+    override fun existsByAuthorId(authorId: Int): Boolean = books.values.any { it.author.id == authorId }
 }

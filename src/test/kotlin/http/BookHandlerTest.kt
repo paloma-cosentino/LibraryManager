@@ -6,6 +6,7 @@ import org.example.model.BookCategory
 import org.example.model.PagedResult
 import org.example.repository.InMemoryAuthorRepository
 import org.example.repository.InMemoryBookRepository
+import org.example.repository.InMemoryLoanRepository
 import org.example.service.BookService
 import org.http4k.core.Body
 import org.http4k.core.HttpHandler
@@ -32,7 +33,7 @@ class BookHandlerTest {
             save(Author(name = "George Orwell"))
             save(Author(name = "Nobody"))
         }
-        val service = BookService(InMemoryBookRepository(), authorRepository)
+        val service = BookService(InMemoryBookRepository(), authorRepository, InMemoryLoanRepository())
         val handler = BookHandler(service)
         app = bookRoutes(handler).asActor(anAdmin)
     }
@@ -255,5 +256,12 @@ class BookHandlerTest {
         val response = app(Request(GET, "/books/${created.id}"))
 
         assertEquals(NOT_FOUND, response.status)
+    }
+
+    @Test
+    fun `DELETE books returns 400 when id is not a number`() {
+        val response = app(Request(DELETE, "/books/abc"))
+
+        assertEquals(BAD_REQUEST, response.status)
     }
 }

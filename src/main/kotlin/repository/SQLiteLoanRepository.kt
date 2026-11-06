@@ -85,7 +85,17 @@ class SQLiteLoanRepository(private val database: Database) : LoanRepository{
             .map { it.toLoan() }
     }
 
-    override fun save(loan: Loan): Loan = transaction(database) {
+    override fun existsByUserId(userId: Int): Boolean = transaction(database) {
+        !LoanTable.selectAll().where { LoanTable.userId eq userId }.limit(1).empty()
+    }
+
+    override fun existsByBookId(bookId: Int): Boolean = transaction(database) {
+        !LoanTable.selectAll().where { LoanTable.bookId eq bookId }.limit(1).empty()
+    }
+
+    override fun save(loan: Loan): Loan = translatingForeignKeyViolations("Loan", loan.id) { insert(loan) }
+
+    private fun insert(loan: Loan): Loan = transaction(database) {
         loan.copy(
             id = LoanTable.insert {
                 it[bookId] = loan.book.id

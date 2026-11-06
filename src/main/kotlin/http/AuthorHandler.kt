@@ -57,8 +57,10 @@ class AuthorHandler(private val service: IAuthorService){
     }
 
     val delete: HttpHandler = { request ->
-        if (service.removeAuthor(idPath(request))) Response.Companion(Status.NO_CONTENT)
-        else Response.Companion(Status.NOT_FOUND)
+        handleAuthorExceptions {
+            if (service.removeAuthor(idPath(request))) Response.Companion(Status.NO_CONTENT)
+            else Response.Companion(Status.NOT_FOUND)
+        }
     }
 }
 

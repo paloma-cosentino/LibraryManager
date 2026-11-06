@@ -23,16 +23,16 @@ fun main() {
     val loanRepository   = SQLiteLoanRepository(database)
     val userRepository   = SQLiteUserRepository(database)
 
-    val authorService    = AuthorService(authorRepository)
+    val authorService    = AuthorService(authorRepository, bookRepository)
     val authorHandler    = AuthorHandler(authorService)
 
-    val bookService    = BookService(bookRepository, authorRepository)
+    val bookService    = BookService(bookRepository, authorRepository, loanRepository)
     val bookHandler    = BookHandler(bookService)
 
     val loanService    = LoanService(bookRepository, loanRepository, userRepository)
     val loanHandler    = LoanHandler(loanService)
 
-    val userService    = UserService(userRepository)
+    val userService    = UserService(userRepository, loanRepository)
     val userHandler    = UserHandler(userService)
 
     val unknownAdminEmails = userService.promoteAdmins(System.getenv("ADMIN_EMAILS")?.split(",").orEmpty())

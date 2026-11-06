@@ -25,6 +25,7 @@ catch (e: BookExceptions.DuplicateBookException)   { Response(CONFLICT).body(e.m
 catch (e: BookExceptions.InvalidCategoryException) { Response(BAD_REQUEST).body(e.message!!) }
 catch (e: BookExceptions.InvalidQuantityException) { Response(BAD_REQUEST).body(e.message!!) }
 catch (e: BookExceptions.InsufficientQuantityException) { Response(CONFLICT).body(e.message!!) }
+catch (e: BookExceptions.BookHasLoansException)    { Response(CONFLICT).body(e.message!!) }
 catch (e: ConcurrentUpdateException)               { conflictAfterRetries(e) }
 catch (e: AuthorExceptions.AuthorNotFoundException)  { Response(NOT_FOUND).body(e.message!!) }
 catch (e: LensFailure)                         { Response(BAD_REQUEST).body(e.message ?: "Invalid request body") }
@@ -33,6 +34,8 @@ fun handleAuthorExceptions(block: () -> Response): Response = try {
     block()
 } catch (e: AuthorExceptions.AuthorNotFoundException)  { Response(NOT_FOUND).body(e.message!!) }
 catch (e: AuthorExceptions.DuplicateAuthorException) { Response(CONFLICT).body(e.message!!) }
+catch (e: AuthorExceptions.AuthorHasBooksException)  { Response(CONFLICT).body(e.message!!) }
+catch (e: LensFailure)                               { Response(BAD_REQUEST).body(e.message ?: "Invalid request") }
 
 fun handleLoanExceptions(block: () -> Response): Response = try{
     block()
@@ -53,6 +56,7 @@ fun handleUserExceptions(block: () -> Response): Response = try {
 catch (e: UserExceptions.UserEmailNotFoundException)   { Response(NOT_FOUND).body(e.message!!) }
 catch (e: UserExceptions.DuplicateUserException)       { Response(CONFLICT).body(e.message!!) }
 catch (e: UserExceptions.LastAdminException)           { Response(CONFLICT).body(e.message!!) }
+catch (e: UserExceptions.UserHasLoansException)        { Response(CONFLICT).body(e.message!!) }
 catch (e: UserExceptions.InvalidCredentialsException) { Response(UNAUTHORIZED).body(e.message!!) }
 catch (e: AuthorizationExceptions.ForbiddenException) { forbidden(e) }
 catch (e: LensFailure)                                 { Response(BAD_REQUEST).body(e.message ?: "Invalid request body") }

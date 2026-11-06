@@ -9,11 +9,16 @@ import org.example.model.User
 import org.example.model.UserExceptions
 import org.example.model.UserFilter
 import org.example.model.toResponse
+import org.example.repository.LoanRepository
+import org.example.repository.ReferencedRowException
 import org.example.repository.UserRepository
 import org.example.security.JwtService
 import org.mindrot.jbcrypt.BCrypt
 
-class UserService(private val repository: UserRepository): IUserService {
+class UserService(
+    private val repository: UserRepository,
+    private val loanRepository: LoanRepository
+): IUserService {
 
     override fun getAllUsers(filter: UserFilter): PagedResult<User> =
         repository.findAll(filter)
@@ -73,12 +78,15 @@ class UserService(private val repository: UserRepository): IUserService {
 
     // An ADMIN is first demoted through the last-admin guard, so deleting admins is covered by the
     // same invariant as demoting them. If the delete then fails, the demotion is undone.
+    // Any loan, returned or not, keeps the account (loan history must keep its borrower). Checked
+    // before the demotion so a refusal has no side effects; the FK catches a loan that races in.
     override fun removeUser(id: Int): Boolean {
         val target = repository.findById(id) ?: return false
-        if (target.role != Role.ADMIN) return repository.delete(id)
+        if (loanRepository.existsByUserId(id)) throw UserExceptions.UserHasLoansException(id)
+        if (target.role != Role.ADMIN) return deleteUnlessReferenced(id)
         if (!demoteKeepingAnAdmin(id)) return false
         val deleted = try {
-            repository.delete(id)
+            deleteUnlessReferenced(id)
         } catch (e: Exception) {
             repository.updateRole(id, Role.ADMIN)
             throw e
@@ -86,6 +94,13 @@ class UserService(private val repository: UserRepository): IUserService {
         if (!deleted) repository.updateRole(id, Role.ADMIN)
         return deleted
     }
+
+    private fun deleteUnlessReferenced(id: Int): Boolean =
+        try {
+            repository.delete(id)
+        } catch (e: ReferencedRowException) {
+            throw UserExceptions.UserHasLoansException(id)
+        }
 
     override fun changeRole(id: Int, role: Role): User {
         val target = getUserById(id)

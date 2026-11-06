@@ -5,13 +5,14 @@ import org.example.model.AuthorizationExceptions.ForbiddenException
 import org.example.model.Role
 import org.example.model.User
 import org.example.model.UserExceptions
+import org.example.repository.InMemoryLoanRepository
 import org.example.repository.InMemoryUserRepository
 import kotlin.test.*
 
 class UserServiceAuthorizationTest {
 
     private val repository = InMemoryUserRepository()
-    private val service = UserService(repository)
+    private val service = UserService(repository, InMemoryLoanRepository())
     private val alice = repository.save(User(name = "Alice", email = "alice@example.com", passwordHash = "h"))
     private val bob = repository.save(User(name = "Bob", email = "bob@example.com", passwordHash = "h"))
     private val asAlice = Actor(alice.id, Role.USER)

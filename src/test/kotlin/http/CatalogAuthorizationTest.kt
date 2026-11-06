@@ -7,6 +7,7 @@ import org.example.model.BookCategory
 import org.example.model.BookFilter
 import org.example.repository.InMemoryAuthorRepository
 import org.example.repository.InMemoryBookRepository
+import org.example.repository.InMemoryLoanRepository
 import org.example.service.AuthorService
 import org.example.service.BookService
 import org.http4k.core.Method.*
@@ -24,8 +25,8 @@ class CatalogAuthorizationTest {
     private val dune = books.save(Book(title = "Dune", author = herbert, category = BookCategory.SCIENCE_FICTION, quantity = 3))
 
     private val catalog = routes(
-        bookRoutes(BookHandler(BookService(books, authors))),
-        authorRoutes(AuthorHandler(AuthorService(authors)))
+        bookRoutes(BookHandler(BookService(books, authors, InMemoryLoanRepository()))),
+        authorRoutes(AuthorHandler(AuthorService(authors, books)))
     )
 
     private fun json(method: org.http4k.core.Method, uri: String, body: String) =

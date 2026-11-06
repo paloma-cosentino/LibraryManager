@@ -91,8 +91,10 @@ class BookHandler(private val service: IBookService) {
     }
 
     val delete: HttpHandler = { request ->
-        if (service.removeBook(idPath(request))) Response(NO_CONTENT)
-        else Response(NOT_FOUND)
+        handleBookExceptions {
+            if (service.removeBook(idPath(request))) Response(NO_CONTENT)
+            else Response(NOT_FOUND)
+        }
     }
 }
 

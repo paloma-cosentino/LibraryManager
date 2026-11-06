@@ -17,4 +17,6 @@ object BookExceptions {
     class InsufficientQuantityException(title: String, quantity: Int, change: Int) : IllegalArgumentException(
         "Cannot change quantity of [$title] by [$change]: only [$quantity] in stock"
     )
+
+    class BookHasLoansException(id: Int) : IllegalArgumentException("Book with id [$id] has loans and cannot be deleted")
 }

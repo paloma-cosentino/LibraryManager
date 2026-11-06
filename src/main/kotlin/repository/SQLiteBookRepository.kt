@@ -97,7 +97,11 @@ class SQLiteBookRepository(private val database: Database): BookRepository {
         }
     }
 
-    override fun delete(id: Int): Boolean = transaction(database){
-        BookTable.deleteWhere { BookTable.id eq id } > 0
+    override fun existsByAuthorId(authorId: Int): Boolean = transaction(database) {
+        !BookTable.selectAll().where { BookTable.authorId eq authorId }.limit(1).empty()
+    }
+
+    override fun delete(id: Int): Boolean = translatingForeignKeyViolations("Book", id) {
+        transaction(database) { BookTable.deleteWhere { BookTable.id eq id } > 0 }
     }
 }
