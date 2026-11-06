@@ -2,6 +2,7 @@ package org.example.http
 
 import org.example.model.LoginResponse
 import org.example.model.PagedResult
+import org.example.model.Role
 import org.example.model.UserResponse
 import org.example.repository.InMemoryUserRepository
 import org.example.service.UserService
@@ -22,13 +23,15 @@ class UserHandlerTest {
 
     private lateinit var app: HttpHandler
     private lateinit var authApp: HttpHandler
+    private lateinit var repository: InMemoryUserRepository
     private val userResponseLens  = Body.auto<UserResponse>().toLens()
     private val pagedUsersLens    = Body.auto<PagedResult<UserResponse>>().toLens()
     private val loginResponseLens = Body.auto<LoginResponse>().toLens()
 
     @BeforeTest
     fun setUp() {
-        val service = UserService(InMemoryUserRepository())
+        repository = InMemoryUserRepository()
+        val service = UserService(repository)
         val handler = UserHandler(service)
         val public  = publicUserRoutes(handler)
         val protected = userRoutes(handler)
@@ -292,6 +295,45 @@ class UserHandlerTest {
     }
 
     // ─── authFilter — rotas protegidas ────────────────────────────────────────
+
+    @Test
+    fun `POST auth login returns the stored role and no passwordHash`() {
+        postUser("Alice", "alice@example.com", "senha123")
+        repository.updateRole(repository.findByEmail("alice@example.com")!!.id, Role.ADMIN)
+
+        val response = postLogin("alice@example.com", "senha123")
+
+        assertEquals(Role.ADMIN, loginResponseLens(response).user.role)
+        assertFalse(response.bodyString().contains("passwordHash"))
+        assertFalse(response.bodyString().contains("senha123"))
+    }
+
+    @Test
+    fun `GET users items include each stored role and no passwordHash`() {
+        postUser("Alice", "alice@example.com")
+        postUser("Bob", "bob@example.com")
+        repository.updateRole(repository.findByEmail("alice@example.com")!!.id, Role.ADMIN)
+
+        val response = app(Request(GET, "/users"))
+
+        assertEquals(
+            mapOf("alice@example.com" to Role.ADMIN, "bob@example.com" to Role.USER),
+            pagedUsersLens(response).data.associate { it.email to it.role }
+        )
+        assertFalse(response.bodyString().contains("passwordHash"))
+    }
+
+    @Test
+    fun `POST users ignores a requested ADMIN role and creates a USER`() {
+        val response = authApp(
+            Request(POST, "/users")
+                .header("Content-Type", "application/json")
+                .body("""{"id":0,"name":"Mallory","email":"mallory@example.com","passwordHash":"senha123","role":"ADMIN"}""")
+        )
+
+        assertEquals(OK, response.status)
+        assertEquals(Role.USER, repository.findByEmail("mallory@example.com")?.role)
+    }
 
     @Test
     fun `protected route returns 401 without token`() {

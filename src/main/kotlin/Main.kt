@@ -33,6 +33,11 @@ fun main() {
     val userService    = UserService(userRepository)
     val userHandler    = UserHandler(userService)
 
+    val unknownAdminEmails = userService.promoteAdmins(System.getenv("ADMIN_EMAILS")?.split(",").orEmpty())
+    if (unknownAdminEmails.isNotEmpty()) {
+        println("ADMIN_EMAILS entries with no matching account (not promoted): ${unknownAdminEmails.joinToString(", ")}")
+    }
+
     val uiHandler = UiHandler()
 
     // Scoped to this group only, so public routes that share a path with a

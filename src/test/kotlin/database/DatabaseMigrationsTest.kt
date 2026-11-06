@@ -33,6 +33,8 @@ class DatabaseMigrationsTest {
             statement.executeUpdate("INSERT INTO books (id, title, author_id, category, quantity, published_year, edition) VALUES (2, 'Dune Messiah', 1, 'Science Fiction', 0, NULL, '2nd')")
             statement.executeUpdate("INSERT INTO loans (id, book_id, borrower_name, borrowed_at, due_date, returned_at) VALUES (1, 2, 'Alice', '2026-10-01', '2026-10-15', NULL)")
             statement.executeUpdate("INSERT INTO loans (id, book_id, borrower_name, borrowed_at, due_date, returned_at) VALUES (2, 1, 'Bob', '2026-10-02', '2026-10-16', '2026-10-10')")
+            statement.executeUpdate("""INSERT INTO users (id, "name", email, password_hash) VALUES (1, 'Alice', 'alice@example.com', 'hash-a')""")
+            statement.executeUpdate("""INSERT INTO users (id, "name", email, password_hash) VALUES (2, 'Bob', 'bob@example.com', 'hash-b')""")
         }
     }
 
@@ -130,6 +132,56 @@ class DatabaseMigrationsTest {
         }
     }
 
+    @Test
+    fun `migrate adds role USER to existing users and preserves rows`() {
+        createOldSchemaWithRows()
+        val usersBefore = rows("users")
+
+        DatabaseMigrations.migrate(url)
+
+        assertEquals(2, usersBefore.size)
+        assertEquals(usersBefore.map { it + ("role" to "USER") }, rows("users"))
+    }
+
+    @Test
+    fun `migrate leaves an already migrated users table and its roles untouched`() {
+        createOldSchemaWithRows()
+        DatabaseMigrations.migrate(url)
+        withConnection { c -> c.createStatement().use { it.executeUpdate("UPDATE users SET role = 'ADMIN' WHERE id = 1") } }
+        val schemaBefore = schemaSql()
+        val usersBefore = rows("users")
+
+        DatabaseMigrations.migrate(url)
+
+        assertEquals(schemaBefore, schemaSql())
+        assertEquals(usersBefore, rows("users"))
+    }
+
+    @Test
+    fun `migrated users schema matches a fresh database`() {
+        createOldSchemaWithRows()
+        DatabaseMigrations.migrate(url)
+        val freshFile = File.createTempFile("fresh-test", ".db").apply { deleteOnExit() }
+        try {
+            val freshUrl = "jdbc:sqlite:${freshFile.absolutePath}"
+            DatabaseFactory.init(freshUrl)
+
+            assertEquals(columnInfo(freshUrl, "users"), columnInfo(url, "users"))
+            assertEquals(checkConstraintNames(freshUrl, "users"), checkConstraintNames(url, "users"))
+            assertEquals(tableSql(freshUrl, "users"), tableSql(url, "users"))
+        } finally {
+            freshFile.delete()
+        }
+    }
+
+    private fun tableSql(databaseUrl: String, table: String): String =
+        DriverManager.getConnection(databaseUrl).use { connection ->
+            connection.prepareStatement("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?").use { statement ->
+                statement.setString(1, table)
+                statement.executeQuery().use { it.next(); it.getString("sql") }
+            }
+        }
+
     private fun checkConstraintNames(databaseUrl: String, vararg tables: String = arrayOf("books", "loans")): Set<String> =
         DriverManager.getConnection(databaseUrl).use { connection ->
             connection.createStatement().use { statement ->
@@ -170,6 +222,7 @@ class DatabaseMigrationsTest {
         val FRESH_ROWS = listOf(
             """INSERT INTO authors (id, "name") VALUES (1, 'Frank Herbert')""",
             "INSERT INTO books (id, title, author_id, category, quantity) VALUES (1, 'Dune', 1, 'Science Fiction', 3)",
+            """INSERT INTO users (id, "name", email, password_hash) VALUES (1, 'Alice', 'alice@example.com', 'h')""",
             "INSERT INTO loans (id, book_id, borrower_name, borrowed_at, due_date) VALUES (1, 1, 'Alice', '2026-10-01', '2026-10-15')"
         )
         val OLD_SCHEMA = listOf(

@@ -2,10 +2,11 @@ package org.example.service
 
 import org.example.model.LoginResponse
 import org.example.model.PagedResult
+import org.example.model.Role
 import org.example.model.User
 import org.example.model.UserExceptions
 import org.example.model.UserFilter
-import org.example.model.UserResponse
+import org.example.model.toResponse
 import org.example.repository.UserRepository
 import org.example.security.JwtService
 import org.mindrot.jbcrypt.BCrypt
@@ -28,7 +29,8 @@ class UserService(private val repository: UserRepository): IUserService {
             throw UserExceptions.DuplicateUserException(email)
         }
         val passwordHash = BCrypt.hashpw(password, BCrypt.gensalt())
-        return repository.save(User(name = name, email = email, passwordHash = passwordHash))
+        // Sign-up never grants privilege; ADMIN only via ADMIN_EMAILS bootstrap or an admin action.
+        return repository.save(User(name = name, email = email, passwordHash = passwordHash, role = Role.USER))
     }
 
     override fun updateUser(user: User) = repository.update(user)
@@ -57,6 +59,14 @@ class UserService(private val repository: UserRepository): IUserService {
 
     override fun removeUser(id: Int) = repository.delete(id)
 
+    // Startup bootstrap from ADMIN_EMAILS: only promotes existing accounts (exact email match),
+    // never creates accounts and never demotes anyone, so rerunning it is harmless.
+    fun promoteAdmins(emails: Collection<String>): List<String> =
+        emails.map(String::trim).filter(String::isNotEmpty).filterNot { email ->
+            val user = repository.findByEmail(email)
+            user != null && (user.role == Role.ADMIN || repository.updateRole(user.id, Role.ADMIN))
+        }
+
     override fun login(email: String, password: String): LoginResponse {
         val user = repository.findByEmail(email)
             ?: throw UserExceptions.UserEmailNotFoundException(email)
@@ -66,7 +76,6 @@ class UserService(private val repository: UserRepository): IUserService {
         }
 
         val token = JwtService.generateToken(user.id, user.email)
-        val userResponse = UserResponse(id = user.id, name = user.name, email = user.email)
-        return LoginResponse(token = token, user = userResponse)
+        return LoginResponse(token = token, user = user.toResponse())
     }
 }

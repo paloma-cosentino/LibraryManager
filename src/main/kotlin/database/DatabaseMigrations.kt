@@ -9,13 +9,17 @@ import java.sql.DriverManager
  * and must run before SchemaUtils.create so that fresh databases simply skip every step.
  */
 object DatabaseMigrations {
-    private data class AddColumn(val table: String, val column: String, val definition: String)
+    // sqlName is the identifier exactly as Exposed writes it in CREATE TABLE, so the stored
+    // table SQL of a migrated database matches a fresh one.
+    private data class AddColumn(val table: String, val column: String, val definition: String, val sqlName: String = column)
 
     // Matches what Exposed generates for integer("version").default(0) on a fresh database,
     // including its named signed-integer range CHECK, so migrated and fresh schemas enforce the same.
+    // users.role matches varchar("role", 20).default("USER"); existing accounts become USER.
     private val steps = listOf(
         AddColumn("books", "version", versionDefinition("books")),
         AddColumn("loans", "version", versionDefinition("loans")),
+        AddColumn("users", "role", "VARCHAR(20) DEFAULT 'USER' NOT NULL", sqlName = "\"role\""),
     )
 
     private fun versionDefinition(table: String) =
@@ -33,7 +37,7 @@ object DatabaseMigrations {
         val columns = columnNames(step.table)
         if (columns.isEmpty() || step.column in columns) return
         createStatement().use {
-            it.executeUpdate("ALTER TABLE ${step.table} ADD COLUMN ${step.column} ${step.definition}")
+            it.executeUpdate("ALTER TABLE ${step.table} ADD COLUMN ${step.sqlName} ${step.definition}")
         }
     }
 

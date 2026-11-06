@@ -5,6 +5,7 @@ import org.example.model.PagedResult
 import org.example.model.User
 import org.example.model.UserFilter
 import org.example.model.UserResponse
+import org.example.model.toResponse
 import org.example.service.IUserService
 import org.http4k.core.Body
 import org.http4k.core.HttpHandler
@@ -43,7 +44,7 @@ class UserHandler(private val service: IUserService) {
         val result = service.getAllUsers(filter)
         // Never serialize the full User (and its passwordHash) over the wire.
         val response = PagedResult(
-            data = result.data.map { UserResponse(it.id, it.name, it.email) },
+            data = result.data.map { it.toResponse() },
             page = result.page,
             pageSize = result.pageSize,
             total = result.total,
@@ -55,10 +56,11 @@ class UserHandler(private val service: IUserService) {
     val getByEmail: HttpHandler = { request ->
         handleUserExceptions {
             val user = service.getUserByEmail(emailQuery(request))
-            userResponseLens(UserResponse(user.id, user.name, user.email), Response.Companion(Status.OK))
+            userResponseLens(user.toResponse(), Response.Companion(Status.OK))
         }
     }
 
+    // Only name/email/password are taken from the sign-up body; any "role" it carries is ignored.
     val create: HttpHandler = { request ->
         handleUserExceptions {
             val saved = service.addUser(
@@ -66,8 +68,7 @@ class UserHandler(private val service: IUserService) {
                 email = userLens(request).email,
                 password = userLens(request).passwordHash
             )
-            val response = UserResponse(saved.id, saved.name, saved.email)
-            userResponseLens(response, Response.Companion(Status.OK))
+            userResponseLens(saved.toResponse(), Response.Companion(Status.OK))
         }
     }
 
@@ -76,7 +77,7 @@ class UserHandler(private val service: IUserService) {
             val body = updateUserRequestLens(request)
             val updated = service.updateUserProfile(idPath(request), body.name, body.email)
             if (updated == null) Response.Companion(Status.NOT_FOUND)
-            else userResponseLens(UserResponse(updated.id, updated.name, updated.email), Response.Companion(Status.OK))
+            else userResponseLens(updated.toResponse(), Response.Companion(Status.OK))
         }
     }
 
