@@ -111,6 +111,14 @@ class BookServiceTest {
     }
 
     @Test
+    fun `addBook throws InvalidQuantityException when quantity is negative`() {
+        assertFailsWith<BookExceptions.InvalidQuantityException> {
+            service.addBook("Clean Code", "Robert C. Martin", "Technology", -1)
+        }
+        assertTrue(service.getAllBooks(BookFilter(title = null, author = null, category = null)).data.isEmpty())
+    }
+
+    @Test
     fun `addBook creates author automatically when author does not exist`() {
         val book = service.addBook("Duna", "Frank Herbert", "Science Fiction", 4)
 

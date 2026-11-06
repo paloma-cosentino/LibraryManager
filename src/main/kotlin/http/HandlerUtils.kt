@@ -16,6 +16,7 @@ fun handleBookExceptions(block: () -> Response): Response = try {
 } catch (e: BookExceptions.BookNotFoundException)    { Response(NOT_FOUND).body(e.message!!) }
 catch (e: BookExceptions.DuplicateBookException)   { Response(CONFLICT).body(e.message!!) }
 catch (e: BookExceptions.InvalidCategoryException) { Response(BAD_REQUEST).body(e.message!!) }
+catch (e: BookExceptions.InvalidQuantityException) { Response(BAD_REQUEST).body(e.message!!) }
 catch (e: AuthorExceptions.AuthorNotFoundException)  { Response(NOT_FOUND).body(e.message!!) }
 catch (e: LensFailure)                         { Response(BAD_REQUEST).body(e.message ?: "Invalid request body") }
 

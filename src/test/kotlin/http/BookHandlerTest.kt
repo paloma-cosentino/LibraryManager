@@ -121,6 +121,13 @@ class BookHandlerTest {
         assertEquals(BAD_REQUEST, response.status)
     }
 
+    @Test
+    fun `POST books returns 400 when quantity is negative`() {
+        val response = postBook(quantity = -1)
+
+        assertEquals(BAD_REQUEST, response.status)
+    }
+
     // ─── PUT /books/{id} ──────────────────────────────────────────────────────
 
     @Test

@@ -10,4 +10,7 @@ object BookExceptions {
         "Invalid category [$value]. Valid values: ${BookCategory.entries.map { it.displayName }}"
     )
 
+    class InvalidQuantityException(quantity: Number) : IllegalArgumentException(
+        "Invalid quantity [$quantity]. Quantity must be between 0 and ${Int.MAX_VALUE}"
+    )
 }

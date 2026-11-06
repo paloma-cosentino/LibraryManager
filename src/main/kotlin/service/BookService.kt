@@ -27,6 +27,7 @@ class BookService(
         publishedYear: Int?,
         edition: String?
     ): Book {
+        if (quantity < 0) throw BookExceptions.InvalidQuantityException(quantity)
         val author = resolveAuthor(authorName)
         val bookCategory = resolveCategory(category)
         if (bookRepository.findByTitleAndAuthor(title, author.id) != null) {
