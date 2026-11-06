@@ -146,20 +146,19 @@ class BookServiceTest {
     // ─── updateBook ───────────────────────────────────────────────────────────
 
     @Test
-    fun `updateBook changes book fields`() {
+    fun `updateBook changes book details and keeps quantity`() {
         val added = service.addBook("Clean Code", "Robert C. Martin", "Technology", 3)
 
         val updated = service.updateBook(
             id         = added.id,
             title      = "Clean Code 2nd Ed",
             authorName = added.author.name,
-            category   = added.category.displayName,
-            quantity   = 10
+            category   = added.category.displayName
         )
 
         assertNotNull(updated)
         assertEquals("Clean Code 2nd Ed", updated.title)
-        assertEquals(10, updated.quantity)
+        assertEquals(3, updated.quantity)
     }
 
     @Test
@@ -167,30 +166,30 @@ class BookServiceTest {
         val added = service.addBook("Clean Code", "Robert C. Martin", "Technology", 3)
         service.updateBook(
             id         = added.id,
-            title      = added.title,
+            title      = "Clean Code 2nd Ed",
             authorName = added.author.name,
-            category   = added.category.displayName,
-            quantity   = 10
+            category   = added.category.displayName
         )
 
         val found = service.getBookById(added.id)
 
-        assertEquals(10, found.quantity)
+        assertEquals("Clean Code 2nd Ed", found.title)
+        assertEquals(3, found.quantity)
     }
 
     @Test
     fun `updateBook on a book that was already written succeeds`() {
         val added = service.addBook("Clean Code", "Robert C. Martin", "Technology", 3)
-        service.updateBook(added.id, "Clean Code 2nd Ed", added.author.name, added.category.displayName, 3)
+        service.updateBook(added.id, "Clean Code 2nd Ed", added.author.name, added.category.displayName)
 
-        val updated = service.updateBook(added.id, "Clean Code 3rd Ed", added.author.name, added.category.displayName, 3)
+        val updated = service.updateBook(added.id, "Clean Code 3rd Ed", added.author.name, added.category.displayName)
 
         assertEquals("Clean Code 3rd Ed", updated?.title)
     }
 
     @Test
     fun `updateBook returns null when book does not exist`() {
-        assertNull(service.updateBook(999, "Ghost Book", "Robert C. Martin", "Fiction", 0))
+        assertNull(service.updateBook(999, "Ghost Book", "Robert C. Martin", "Fiction"))
     }
 
     @Test
@@ -201,13 +200,44 @@ class BookServiceTest {
             id         = added.id,
             title      = added.title,
             authorName = "New Unknown Author",
-            category   = added.category.displayName,
-            quantity   = added.quantity
+            category   = added.category.displayName
         )
 
         assertNotNull(updated)
         assertEquals("New Unknown Author", updated.author.name)
         assertNotNull(authorRepository.findByName("New Unknown Author"))
+    }
+
+    // ─── adjustBookQuantity ───────────────────────────────────────────────────
+
+    @Test
+    fun `adjustBookQuantity applies the change and persists it`() {
+        val added = service.addBook("Clean Code", "Robert C. Martin", "Technology", 3)
+
+        val adjusted = service.adjustBookQuantity(added.id, -2)
+
+        assertEquals(1, adjusted.quantity)
+        assertEquals(1, service.getBookById(added.id).quantity)
+    }
+
+    @Test
+    fun `adjustBookQuantity allows a zero change`() {
+        val added = service.addBook("Clean Code", "Robert C. Martin", "Technology", 3)
+
+        assertEquals(3, service.adjustBookQuantity(added.id, 0).quantity)
+    }
+
+    @Test
+    fun `adjustBookQuantity throws BookNotFoundException when book does not exist`() {
+        assertFailsWith<BookExceptions.BookNotFoundException> { service.adjustBookQuantity(999, 1) }
+    }
+
+    @Test
+    fun `adjustBookQuantity throws InsufficientQuantityException below zero and leaves stock unchanged`() {
+        val added = service.addBook("Clean Code", "Robert C. Martin", "Technology", 3)
+
+        assertFailsWith<BookExceptions.InsufficientQuantityException> { service.adjustBookQuantity(added.id, -4) }
+        assertEquals(3, service.getBookById(added.id).quantity)
     }
 
     // ─── removeBook ───────────────────────────────────────────────────────────

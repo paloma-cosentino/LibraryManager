@@ -51,26 +51,31 @@ class BookService(
         title: String,
         authorName: String,
         category: String,
-        quantity: Int,
         publishedYear: Int?,
         edition: String?
     ): Book? {
         val author = resolveAuthor(authorName)
         val bookCategory = resolveCategory(category)
         return retryOnConflict {
-            // Re-read on every attempt so the write carries the current version.
+            // Details only: quantity always comes from the freshly read row, so concurrent
+            // stock changes are never overwritten by an edit.
             val current = bookRepository.findById(id) ?: return@retryOnConflict null
             bookRepository.update(
                 current.copy(
                     title = title,
                     author = author,
                     category = bookCategory,
-                    quantity = quantity,
                     publishedYear = publishedYear,
                     edition = edition
                 )
             )
         }
+    }
+
+    override fun adjustBookQuantity(id: Int, change: Int): Book = retryOnConflict {
+        val current = getBookById(id)
+        bookRepository.update(current.withQuantityChangedBy(change))
+            ?: throw BookExceptions.BookNotFoundException(id)
     }
 
     override fun removeBook(id: Int): Boolean = bookRepository.delete(id)

@@ -131,7 +131,23 @@ class BookHandlerTest {
     // ─── PUT /books/{id} ──────────────────────────────────────────────────────
 
     @Test
-    fun `PUT books returns 200 and updated book`() {
+    fun `PUT books returns 200 and updated details with unchanged quantity`() {
+        val created = bookLens(postBook())
+
+        val response = app(
+            Request(PUT, "/books/${created.id}")
+                .header("Content-Type", "application/json")
+                .body("""{"title":"Duna Messiah","author":"Frank Herbert","category":"Science Fiction"}""")
+        )
+
+        assertEquals(OK, response.status)
+        val updated = bookLens(response)
+        assertEquals("Duna Messiah", updated.title)
+        assertEquals(5, updated.quantity)
+    }
+
+    @Test
+    fun `PUT books returns 400 directing to PATCH when quantity is sent`() {
         val created = bookLens(postBook())
 
         val response = app(
@@ -140,10 +156,10 @@ class BookHandlerTest {
                 .body("""{"title":"Duna Messiah","author":"Frank Herbert","category":"Science Fiction","quantity":10}""")
         )
 
-        assertEquals(OK, response.status)
-        val updated = bookLens(response)
-        assertEquals("Duna Messiah", updated.title)
-        assertEquals(10, updated.quantity)
+        assertEquals(BAD_REQUEST, response.status)
+        assertTrue(response.bodyString().contains("PATCH /books/{id}/quantity"))
+        assertEquals(5, bookLens(app(Request(GET, "/books/${created.id}"))).quantity)
+        assertEquals("Duna", bookLens(app(Request(GET, "/books/${created.id}"))).title)
     }
 
     @Test
@@ -151,10 +167,66 @@ class BookHandlerTest {
         val response = app(
             Request(PUT, "/books/999")
                 .header("Content-Type", "application/json")
-                .body("""{"title":"Ghost","author":"Nobody","category":"Fiction","quantity":1}""")
+                .body("""{"title":"Ghost","author":"Nobody","category":"Fiction"}""")
         )
 
         assertEquals(NOT_FOUND, response.status)
+    }
+
+    // ─── PATCH /books/{id}/quantity ───────────────────────────────────────────
+
+    private fun patchQuantity(id: Int, body: String) = app(
+        Request(PATCH, "/books/$id/quantity")
+            .header("Content-Type", "application/json")
+            .body(body)
+    )
+
+    @Test
+    fun `PATCH quantity returns 200 and the adjusted book`() {
+        val created = bookLens(postBook(quantity = 5))
+
+        val response = patchQuantity(created.id, """{"change":-2}""")
+
+        assertEquals(OK, response.status)
+        assertEquals(3, bookLens(response).quantity)
+    }
+
+    @Test
+    fun `PATCH quantity returns 409 when the change would go below zero`() {
+        val created = bookLens(postBook(quantity = 1))
+
+        assertEquals(CONFLICT, patchQuantity(created.id, """{"change":-2}""").status)
+    }
+
+    @Test
+    fun `PATCH quantity returns 200 for a zero change`() {
+        val created = bookLens(postBook(quantity = 5))
+
+        val response = patchQuantity(created.id, """{"change":0}""")
+
+        assertEquals(OK, response.status)
+        assertEquals(5, bookLens(response).quantity)
+    }
+
+    @Test
+    fun `PATCH quantity returns 404 when book does not exist`() {
+        assertEquals(NOT_FOUND, patchQuantity(999, """{"change":1}""").status)
+    }
+
+    @Test
+    fun `PATCH quantity returns 400 for a missing or invalid body`() {
+        val created = bookLens(postBook())
+
+        assertEquals(BAD_REQUEST, patchQuantity(created.id, """{}""").status)
+        assertEquals(BAD_REQUEST, patchQuantity(created.id, """{"change":"lots"}""").status)
+        assertEquals(BAD_REQUEST, patchQuantity(created.id, "not json").status)
+    }
+
+    @Test
+    fun `PATCH quantity returns 400 when the result would overflow`() {
+        val created = bookLens(postBook(quantity = Int.MAX_VALUE))
+
+        assertEquals(BAD_REQUEST, patchQuantity(created.id, """{"change":1}""").status)
     }
 
     // ─── DELETE /books/{id} ───────────────────────────────────────────────────

@@ -8,9 +8,11 @@ import org.http4k.core.Body
 import org.http4k.core.HttpHandler
 import org.http4k.core.Method.DELETE
 import org.http4k.core.Method.GET
+import org.http4k.core.Method.PATCH
 import org.http4k.core.Method.POST
 import org.http4k.core.Method.PUT
 import org.http4k.core.Response
+import org.http4k.core.Status.Companion.BAD_REQUEST
 import org.http4k.core.Status.Companion.NOT_FOUND
 import org.http4k.core.Status.Companion.NO_CONTENT
 import org.http4k.core.Status.Companion.OK
@@ -26,12 +28,15 @@ fun bookRoutes(handler: BookHandler) = routes(
     "/books"      bind POST   to handler.create,
     "/books/{id}" bind GET    to handler.getById,
     "/books/{id}" bind PUT    to handler.update,
+    "/books/{id}/quantity" bind PATCH to handler.adjustQuantity,
     "/books/{id}" bind DELETE to handler.delete
 )
 
 class BookHandler(private val service: IBookService) {
     private val bookLens        = Body.auto<Book>().toLens()
     private val bookRequestLens = Body.auto<BookRequest>().toLens()
+    private val bookDetailsRequestLens = Body.auto<BookDetailsRequest>().toLens()
+    private val quantityChangeRequestLens = Body.auto<QuantityChangeRequest>().toLens()
     private val pagedBooksLens  = Body.auto<PagedResult<Book>>().toLens()
     private val idPath          = Path.int().of("id")
 
@@ -67,9 +72,20 @@ class BookHandler(private val service: IBookService) {
 
     val update: HttpHandler = { request ->
         handleBookExceptions {
-            val body    = bookRequestLens(request)
-            val updated = service.updateBook(idPath(request), body.title, body.author, body.category, body.quantity, body.publishedYear, body.edition)
+            val body    = bookDetailsRequestLens(request)
+            if (body.quantity != null) {
+                return@handleBookExceptions Response(BAD_REQUEST)
+                    .body("PUT /books/{id} updates details only; use PATCH /books/{id}/quantity to change stock")
+            }
+            val updated = service.updateBook(idPath(request), body.title, body.author, body.category, body.publishedYear, body.edition)
             if (updated == null) Response(NOT_FOUND) else bookLens(updated, Response(OK))
+        }
+    }
+
+    val adjustQuantity: HttpHandler = { request ->
+        handleBookExceptions {
+            val body = quantityChangeRequestLens(request)
+            bookLens(service.adjustBookQuantity(idPath(request), body.change), Response(OK))
         }
     }
 
