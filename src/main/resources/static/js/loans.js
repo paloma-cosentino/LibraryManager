@@ -28,7 +28,10 @@ async function loadLoans() {
 
 function statusBadge(loan) {
     if (loan.isReturned) return `<span class="badge badge-returned">Returned</span>`;
-    if (loan.isOverdue) return `<span class="badge badge-overdue">Overdue</span>`;
+    if (loan.isOverdue) {
+        const days = loan.daysOverdue;
+        return `<span class="badge badge-overdue">Overdue by ${days} ${days === 1 ? "day" : "days"}</span>`;
+    }
     return `<span class="badge badge-active">Active</span>`;
 }
 

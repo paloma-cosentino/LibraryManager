@@ -104,6 +104,14 @@ class LoanServiceTest {
     }
 
     @Test
+    fun `borrowBook with negative daysToReturn creates an overdue loan`() {
+        val loan = service.borrowBook(dune.id, "Alice", -3)
+
+        assertEquals(loan.borrowedAt.minusDays(3), loan.dueDate)
+        assertTrue(loan.isOverdue)
+    }
+
+    @Test
     fun `borrowBook decrements book quantity`() {
         service.borrowBook(dune.id, "Alice", 14)
 
@@ -172,4 +180,3 @@ class LoanServiceTest {
         }
     }
 }
-

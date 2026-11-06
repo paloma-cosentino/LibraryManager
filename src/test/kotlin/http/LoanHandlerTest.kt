@@ -16,6 +16,7 @@ import org.http4k.core.Status.Companion.CONFLICT
 import org.http4k.core.Status.Companion.CREATED
 import org.http4k.core.Status.Companion.NOT_FOUND
 import org.http4k.core.Status.Companion.OK
+import org.http4k.format.Jackson
 import org.http4k.format.Jackson.auto
 import kotlin.test.*
 
@@ -68,6 +69,15 @@ class LoanHandlerTest {
         assertNull(loan.returnedAt)
     }
 
+    @Test
+    fun `POST loans with negative daysToReturn returns 201 and an overdue loan`() {
+        val response = postBorrow(days = -3)
+
+        assertEquals(CREATED, response.status)
+        val json = response.bodyString()
+        assertEquals(true, Jackson.parse(json)["isOverdue"]?.booleanValue(), json)
+        assertEquals(3, Jackson.parse(json)["daysOverdue"]?.intValue(), json)
+    }
 
     @Test
     fun `POST loans returns 404 when book does not exist`() {
@@ -183,4 +193,3 @@ class LoanHandlerTest {
         assertEquals(NOT_FOUND, response.status)
     }
 }
-
