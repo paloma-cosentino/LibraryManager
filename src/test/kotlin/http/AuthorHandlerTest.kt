@@ -25,7 +25,7 @@ class AuthorHandlerTest {
     fun setUp() {
         val service = AuthorService(InMemoryAuthorRepository())
         val handler = AuthorHandler(service)
-        app = authorRoutes(handler)
+        app = authorRoutes(handler).asActor(anAdmin)
     }
 
     // ─── helpers ─────────────────────────────────────────────────────────────

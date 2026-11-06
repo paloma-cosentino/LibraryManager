@@ -12,6 +12,7 @@ import org.http4k.core.HttpHandler
 import org.http4k.core.Method.*
 import org.http4k.core.Response
 import org.http4k.core.Status
+import org.http4k.core.then
 import org.http4k.format.Jackson.auto
 import org.http4k.lens.Path
 import org.http4k.lens.Query
@@ -95,6 +96,14 @@ class UserHandler(private val service: IUserService) {
             else Response.Companion(Status.NOT_FOUND)
         }
     }
+    // Lets clients refresh their role from server state instead of trusting a stored copy.
+    val me: HttpHandler = { request ->
+        handleUserExceptions {
+            val user = service.getUserById(actorLens(request).userId)
+            userResponseLens(user.toResponse(), Response(Status.OK))
+        }
+    }
+
     val login: HttpHandler = { request ->
         val body = loginRequestLens(request)
         handleUserExceptions {
@@ -105,6 +114,7 @@ class UserHandler(private val service: IUserService) {
 }
 
 fun userRoutes(handler: UserHandler) = routes(
+    "/auth/me" bind GET to handler.me,
     "/users" bind GET to handler.getAll,
     "/users/email" bind GET to handler.getByEmail,
     "/users/{id}" bind PUT to handler.update,

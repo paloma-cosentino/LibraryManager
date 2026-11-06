@@ -34,7 +34,7 @@ class BookHandlerTest {
         }
         val service = BookService(InMemoryBookRepository(), authorRepository)
         val handler = BookHandler(service)
-        app = bookRoutes(handler)
+        app = bookRoutes(handler).asActor(anAdmin)
     }
 
     // ─── helpers ─────────────────────────────────────────────────────────────

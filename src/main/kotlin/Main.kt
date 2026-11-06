@@ -10,7 +10,8 @@ import org.example.service.AuthorService
 import org.example.service.BookService
 import org.example.service.LoanService
 import org.example.service.UserService
-import org.http4k.core.Filter
+import org.http4k.core.then
+import org.http4k.filter.ServerFilters
 import org.http4k.routing.routes
 import org.http4k.server.Jetty
 import org.http4k.server.asServer
@@ -18,18 +19,19 @@ import org.http4k.server.asServer
 fun main() {
     val database         = DatabaseFactory.init()
     val authorRepository = SQLiteAuthorRepository(database)
+    val bookRepository   = SQLiteBookRepository(database)
+    val loanRepository   = SQLiteLoanRepository(database)
+    val userRepository   = SQLiteUserRepository(database)
+
     val authorService    = AuthorService(authorRepository)
     val authorHandler    = AuthorHandler(authorService)
 
-    val bookRepository = SQLiteBookRepository(database)
     val bookService    = BookService(bookRepository, authorRepository)
     val bookHandler    = BookHandler(bookService)
 
-    val loanRepository = SQLiteLoanRepository(database)
     val loanService    = LoanService(bookRepository, loanRepository)
     val loanHandler    = LoanHandler(loanService)
 
-    val userRepository = SQLiteUserRepository(database)
     val userService    = UserService(userRepository)
     val userHandler    = UserHandler(userService)
 
@@ -48,7 +50,7 @@ fun main() {
         authorRoutes(authorHandler),
         loanRoutes(loanHandler),
         userRoutes(userHandler)
-    ).withFilter(Filter(::authFilter))
+    ).withFilter(authFilter(userRepository))
 
     // A single flat `routes()` call lets http4k resolve 404 vs 405 correctly
     // across *all* registered routes, public and protected alike. Combining
@@ -56,11 +58,13 @@ fun main() {
     // soon as a path existed in both groups with different methods — e.g.
     // POST /users (public) made GET /users (protected) return a bare 405
     // instead of ever reaching the protected handler.
-    val app = routes(
+    // Outermost, so every request gets a fresh context (the authenticated Actor lives there)
+    // that is discarded when the request completes.
+    val app = ServerFilters.InitialiseRequestContext(requestContexts).then(routes(
         publicUserRoutes(userHandler),
         uiRoutes(uiHandler),
         protectedRoutes
-    )
+    ))
 
     app.asServer(Jetty(8080)).start()
 

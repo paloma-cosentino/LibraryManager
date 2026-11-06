@@ -41,7 +41,7 @@ class LoanHandlerTest {
         val loanRepository = InMemoryLoanRepository()
         val service        = LoanService(bookRepository, loanRepository)
         val handler        = LoanHandler(service)
-        app = loanRoutes(handler)
+        app = loanRoutes(handler).asActor(anAdmin)
     }
 
     // ─── helpers ─────────────────────────────────────────────────────────────

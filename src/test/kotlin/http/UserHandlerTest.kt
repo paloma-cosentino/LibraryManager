@@ -10,6 +10,8 @@ import org.http4k.core.Body
 import org.http4k.core.HttpHandler
 import org.http4k.core.Method.*
 import org.http4k.core.Request
+import org.http4k.core.then
+import org.http4k.filter.ServerFilters
 import org.http4k.core.Status.Companion.CONFLICT
 import org.http4k.core.Status.Companion.NOT_FOUND
 import org.http4k.core.Status.Companion.NO_CONTENT
@@ -22,6 +24,7 @@ import kotlin.test.*
 class UserHandlerTest {
 
     private lateinit var app: HttpHandler
+    private lateinit var unauthenticatedApp: HttpHandler
     private lateinit var authApp: HttpHandler
     private lateinit var repository: InMemoryUserRepository
     private val userResponseLens  = Body.auto<UserResponse>().toLens()
@@ -36,7 +39,8 @@ class UserHandlerTest {
         val public  = publicUserRoutes(handler)
         val protected = userRoutes(handler)
         authApp = public
-        app     = routes(public, protected)
+        unauthenticatedApp = routes(public, protected)
+        app     = unauthenticatedApp.asActor(anAdmin)
     }
 
 
@@ -48,6 +52,9 @@ class UserHandlerTest {
                 .header("Content-Type", "application/json")
                 .body("""{"id":0,"name":"$name","email":"$email","passwordHash":"$password"}""")
         )
+
+    private fun authenticated(handler: HttpHandler) =
+        ServerFilters.InitialiseRequestContext(requestContexts).then(authFilter(repository)).then(handler)
 
     private fun postLogin(email: String, password: String) =
         authApp(
@@ -337,7 +344,7 @@ class UserHandlerTest {
 
     @Test
     fun `protected route returns 401 without token`() {
-        val protectedApp = authFilter(app)
+        val protectedApp = authenticated(unauthenticatedApp)
 
         val response = protectedApp(Request(GET, "/users"))
 
@@ -346,7 +353,7 @@ class UserHandlerTest {
 
     @Test
     fun `protected route returns 401 with invalid token`() {
-        val protectedApp = authFilter(app)
+        val protectedApp = authenticated(unauthenticatedApp)
 
         val response = protectedApp(
             Request(GET, "/users")
@@ -361,12 +368,32 @@ class UserHandlerTest {
         postUser("Alice", "alice@example.com", "senha123")
         val token = loginResponseLens(postLogin("alice@example.com", "senha123")).token
 
-        val protectedApp = authFilter(app)
+        val protectedApp = authenticated(unauthenticatedApp)
         val response = protectedApp(
-            Request(GET, "/users")
+            Request(GET, "/auth/me")
                 .header("Authorization", "Bearer $token")
         )
 
         assertEquals(OK, response.status)
+    }
+
+    @Test
+    fun `GET auth me returns the authenticated user with current role and no passwordHash`() {
+        postUser("Alice", "alice@example.com", "senha123")
+        postUser("Bob", "bob@example.com", "senha123")
+        val token = loginResponseLens(postLogin("alice@example.com", "senha123")).token
+        val alice = repository.findByEmail("alice@example.com")!!
+        repository.updateRole(alice.id, Role.ADMIN)
+
+        val response = authenticated(unauthenticatedApp)(Request(GET, "/auth/me").header("Authorization", "Bearer $token"))
+
+        assertEquals(OK, response.status)
+        assertEquals(UserResponse(alice.id, "Alice", "alice@example.com", Role.ADMIN), userResponseLens(response))
+        assertFalse(response.bodyString().contains("passwordHash"))
+    }
+
+    @Test
+    fun `GET auth me returns 401 without token`() {
+        assertEquals(UNAUTHORIZED, authenticated(unauthenticatedApp)(Request(GET, "/auth/me")).status)
     }
 }
