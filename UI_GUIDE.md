@@ -14,12 +14,12 @@ This guide explains what has been built in the UI layer and how to follow the sa
 | `src/main/resources/templates/header.hbs` | Navbar partial, with active-link highlighting per page |
 | `src/main/resources/templates/footer.hbs` | Footer partial — just the shared `api.js` include |
 | `src/main/resources/templates/login.hbs` | Login page (doesn't use `layout.hbs`, since it has no navbar) |
-| `src/main/resources/templates/books.hbs` | Books list/search/create/edit/delete |
-| `src/main/resources/templates/authors.hbs` | Authors list/search/create/edit/delete |
-| `src/main/resources/templates/loans.hbs` | Loans list/search, borrow form, return action |
-| `src/main/resources/templates/users.hbs` | Users list/search/edit/delete, plus a self-service "change password" modal |
+| `src/main/resources/templates/books.hbs` | Books list/search; create/edit/stock/delete for ADMIN |
+| `src/main/resources/templates/authors.hbs` | Authors list/search; create/edit/delete for ADMIN |
+| `src/main/resources/templates/loans.hbs` | Loans list (own only for USER), borrow form with an account picker for ADMIN, return action for ADMIN |
+| `src/main/resources/templates/users.hbs` | USER: own profile + "change password". ADMIN: users list/search with Role column, role toggle and delete |
 | `src/main/resources/static/css/style.css` | Global styles: navbar, forms, tables, modals, pagination, badges |
-| `src/main/resources/static/js/api.js` | `apiFetch` (JWT-aware fetch), `qs`, `escapeHtml`, `requireAuth`, `logout`, `currentUser` |
+| `src/main/resources/static/js/api.js` | `apiFetch` (JWT-aware fetch), `refreshCurrentUser`, `isAdmin`, `alertFailure`, `qs`, `escapeHtml`, `requireAuth`, `logout`, `currentUser` |
 | `src/main/resources/static/js/*.js` | One script per page (`login.js`, `books.js`, `authors.js`, `loans.js`, `users.js`) |
 
 | Page | Route | Template | JS | Status |
@@ -38,6 +38,12 @@ This guide explains what has been built in the UI layer and how to follow the sa
 
 1. **Browser navigation doesn't send the JWT.** The token lives in `localStorage` and is only attached manually by `apiFetch()` for `fetch()` calls. A plain `<a href="/ui/books">` click is a normal GET request with no `Authorization` header. If `/ui/books` were registered behind `authFilter`, every direct navigation without a token would get a bare `401 Unauthorized` response instead of the HTML page — so the client-side redirect-to-login logic would never even get a chance to run.
 2. **The real security boundary is the REST API**, not the HTML shell. Each page's `.js` file calls `requireAuth()` on load (redirects to `/ui/login` if there's no token) and all data comes from `apiFetch()` calls to the already-protected `/books`, `/authors`, `/loans`, `/users` endpoints. Even if someone loaded the HTML directly, they'd see an empty page with no data, since every API call would 401.
+
+### Roles in the UI
+
+Each page awaits `refreshCurrentUser()` (`GET /auth/me`) before rendering role-dependent controls, and stores the fresh result as `localStorage.user`. The role is never taken from a stored copy, which may be stale after a promotion or demotion. Admin-only controls are `hidden` in the templates and revealed only for `role === "ADMIN"`.
+
+Hiding is a convenience: the server enforces every permission (`403`) and guard (`409`), and pages show the server's message when an action is refused. See the permission table in the README.
 
 **A real routing bug this uncovered:** the original `Main.kt` tried two separately-invoked routers and only treated a `404 NOT_FOUND` response as "try the other router":
 
@@ -61,13 +67,14 @@ val protectedRoutes = routes(
     authorRoutes(authorHandler),
     loanRoutes(loanHandler),
     userRoutes(userHandler)
-).withFilter(Filter(::authFilter))
+).withFilter(authFilter(userRepository))
 
-val app = routes(
+// Outermost: gives each request a fresh context, where authFilter stores the Actor.
+val app = ServerFilters.InitialiseRequestContext(requestContexts).then(routes(
     publicUserRoutes(userHandler),
     uiRoutes(uiHandler),
     protectedRoutes
-)
+))
 ```
 
 ---
@@ -110,7 +117,7 @@ Inside `layout.hbs`, `{{> @partial-block}}` is replaced with everything between 
 books.hbs loads in the browser
      │
      ▼
-books.js runs — requireAuth() first
+books.js runs — requireAuth(), then await refreshCurrentUser() (GET /auth/me) for the role
      │  calls apiFetch("/books" + qs(filters))
      ▼
 api.js adds "Authorization: Bearer <token>"
@@ -137,7 +144,7 @@ JSON → renders rows into the table (via DOM APIs + escapeHtml, not raw innerHT
    ```
 2. **Route** in `UiRoutes.kt`: add `"/ui/books" bind GET to handler.books` inside `uiRoutes(...)`.
 3. **Template** `books.hbs`: wrap content in `{{#> layout pageTitle="..." isBooks=true}} ... {{/layout}}`.
-4. **Script** `books.js`: start with `requireAuth();`, then use `apiFetch`/`qs`/`escapeHtml` from `api.js` to load and render data.
+4. **Script** `books.js`: start with `requireAuth();`, `await refreshCurrentUser()` before showing any role-dependent control, then use `apiFetch`/`qs`/`escapeHtml` from `api.js` to load and render data.
 5. **Styles**: reuse the existing `.toolbar`, `.data-table`, `.pagination`, `.modal` classes in `style.css` rather than inventing new ones per page.
 
 ---
@@ -163,8 +170,16 @@ qs({ title: "", category: "Fantasy", page: 1 })   // → "?category=Fantasy&page
 // Escapes user-controlled text before interpolating into innerHTML
 escapeHtml(book.title)
 
-// Current logged-in user from localStorage, or null
-currentUser()   // → { id, name, email } | null
+// Current user as last stored in localStorage, or null — may be stale; don't use it for roles
+currentUser()   // → { id, name, email, role } | null
+
+// Re-reads the signed-in account from GET /auth/me, stores it, and returns it (null on failure).
+// Await this on page load before showing role-dependent controls.
+await refreshCurrentUser()   // → { id, name, email, role } | null
+isAdmin(user)                // → true only for role "ADMIN"
+
+// Shows the server's message for a refused action (e.g. 403, 409)
+await alertFailure(response, "Fallback message")
 
 // Clears the token and redirects to /ui/login — also called automatically
 // by apiFetch() whenever any API call responds with 401 (expired/invalid token)
@@ -179,9 +194,9 @@ requireAuth()
 
 ## Known limitations / follow-ups worth doing next
 
-1. ~~**`GET /users` and `GET /users/email` leak `passwordHash`**~~ — **fixed.** Both now return `UserResponse` (`id`/`name`/`email` only), `PUT /users/{id}` takes a dedicated `UpdateUserRequest(name, email)` body (no password field, nothing to round-trip), and a new `PATCH /users/{id}/password` endpoint (`ChangePasswordRequest(currentPassword, newPassword)`) handles password changes — it verifies the current password server-side before re-hashing, so it's a *self-service* operation only. The Users page now has a 🔑 "Change password" button, shown only on the logged-in user's own row (in place of the delete button, which is likewise hidden for your own account), opening a small modal that calls the new endpoint directly with `fetch()` (not `apiFetch()`, since a wrong current-password legitimately returns `401` here and `apiFetch()` treats any `401` as an expired session and force-logs-out — see `users.js`). There's still no "admin reset someone else's password" capability — that would need a permissions model this project doesn't have yet — but that's an intentionally separate, bigger feature, not a leftover from this fix.
-2. **No sign-up page** — `POST /users` (registration) is only reachable via direct API calls today; there's no `register.hbs`. `/ui/users` is an admin-style management screen for *existing* users, not a self-service sign-up form.
-3. **Loan creation uses a plain `<select>` of all books** (fetched via `/books?size=100`). Fine for a small library; would need real pagination/search in the dropdown for a larger catalog.
+1. ~~**`GET /users` and `GET /users/email` leak `passwordHash`**~~ — **fixed.** Both return `UserResponse` (`id`/`name`/`email`/`role` only). `PUT /users/{id}` takes `UpdateUserRequest(name, email)` and `PATCH /users/{id}/password` (`ChangePasswordRequest(currentPassword, newPassword)`) verifies the current password before re-hashing — self-only, admins included. On the Users page the 🔑 button appears only on your own row and calls the endpoint with plain `fetch()` (not `apiFetch()`), because a wrong current password legitimately returns `401` and `apiFetch()` would force a logout. There is still no "admin resets someone else's password" feature; that is deliberate.
+2. **No sign-up page** — `POST /users` (registration) is only reachable via direct API calls today; there's no `register.hbs`. New accounts are always `USER`; admins come from `ADMIN_EMAILS` or the role toggle on `/ui/users`.
+3. **Loan creation uses plain `<select>`s** — all books (`/books?size=100`) and, for admins, all accounts (`/users?size=100`). Fine for a small library; a larger one would need search/pagination in the pickers.
 4. **Pagination is simple Prev/Next**, no jump-to-page or page-size selector.
 
 
