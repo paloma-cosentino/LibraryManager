@@ -9,6 +9,7 @@ import org.http4k.core.HttpHandler
 import org.http4k.core.Method.*
 import org.http4k.core.Response
 import org.http4k.core.Status
+import org.http4k.core.then
 import org.http4k.format.Jackson.auto
 import org.http4k.lens.Path
 import org.http4k.lens.Query
@@ -56,16 +57,18 @@ class AuthorHandler(private val service: IAuthorService){
     }
 
     val delete: HttpHandler = { request ->
-        if (service.removeAuthor(idPath(request))) Response.Companion(Status.NO_CONTENT)
-        else Response.Companion(Status.NOT_FOUND)
+        handleAuthorExceptions {
+            if (service.removeAuthor(idPath(request))) Response.Companion(Status.NO_CONTENT)
+            else Response.Companion(Status.NOT_FOUND)
+        }
     }
 }
 
 
 fun authorRoutes(handler: AuthorHandler) = routes(
     "/authors"      bind GET    to handler.getAll,
-    "/authors"      bind POST   to handler.create,
+    "/authors"      bind POST   to requireAdmin.then(handler.create),
     "/authors/{id}" bind GET    to handler.getById,
-    "/authors/{id}" bind PUT    to handler.update,
-    "/authors/{id}" bind DELETE to handler.delete
+    "/authors/{id}" bind PUT    to requireAdmin.then(handler.update),
+    "/authors/{id}" bind DELETE to requireAdmin.then(handler.delete)
 )

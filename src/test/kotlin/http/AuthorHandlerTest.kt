@@ -3,11 +3,13 @@ package org.example.http
 import org.example.model.Author
 import org.example.model.PagedResult
 import org.example.repository.InMemoryAuthorRepository
+import org.example.repository.InMemoryBookRepository
 import org.example.service.AuthorService
 import org.http4k.core.Body
 import org.http4k.core.HttpHandler
 import org.http4k.core.Method.*
 import org.http4k.core.Request
+import org.http4k.core.Status.Companion.BAD_REQUEST
 import org.http4k.core.Status.Companion.CONFLICT
 import org.http4k.core.Status.Companion.NOT_FOUND
 import org.http4k.core.Status.Companion.NO_CONTENT
@@ -23,9 +25,9 @@ class AuthorHandlerTest {
 
     @BeforeTest
     fun setUp() {
-        val service = AuthorService(InMemoryAuthorRepository())
+        val service = AuthorService(InMemoryAuthorRepository(), InMemoryBookRepository())
         val handler = AuthorHandler(service)
-        app = authorRoutes(handler)
+        app = authorRoutes(handler).asActor(anAdmin)
     }
 
     // ─── helpers ─────────────────────────────────────────────────────────────
@@ -159,6 +161,13 @@ class AuthorHandlerTest {
         val response = app(Request(GET, "/authors/${created.id}"))
 
         assertEquals(NOT_FOUND, response.status)
+    }
+
+    @Test
+    fun `DELETE authors returns 400 when id is not a number`() {
+        val response = app(Request(DELETE, "/authors/abc"))
+
+        assertEquals(BAD_REQUEST, response.status)
     }
 }
 

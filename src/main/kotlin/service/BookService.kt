@@ -8,10 +8,13 @@ import org.example.model.BookExceptions
 import org.example.model.PagedResult
 import org.example.repository.AuthorRepository
 import org.example.repository.BookRepository
+import org.example.repository.LoanRepository
+import org.example.repository.ReferencedRowException
 
 class BookService(
     private val bookRepository: BookRepository,
-    private val authorRepository: AuthorRepository
+    private val authorRepository: AuthorRepository,
+    private val loanRepository: LoanRepository
 ): IBookService {
     override fun getAllBooks(filter: BookFilter): PagedResult<Book> =
         bookRepository.findAll(filter)
@@ -27,6 +30,7 @@ class BookService(
         publishedYear: Int?,
         edition: String?
     ): Book {
+        if (quantity < 0) throw BookExceptions.InvalidQuantityException(quantity)
         val author = resolveAuthor(authorName)
         val bookCategory = resolveCategory(category)
         if (bookRepository.findByTitleAndAuthor(title, author.id) != null) {
@@ -50,26 +54,42 @@ class BookService(
         title: String,
         authorName: String,
         category: String,
-        quantity: Int,
         publishedYear: Int?,
         edition: String?
     ): Book? {
         val author = resolveAuthor(authorName)
         val bookCategory = resolveCategory(category)
-        return bookRepository.update(
-            Book(
-                id = id,
-                title = title,
-                author = author,
-                category = bookCategory,
-                quantity = quantity,
-                publishedYear = publishedYear,
-                edition = edition
+        return retryOnConflict {
+            // Details only: quantity always comes from the freshly read row, so concurrent
+            // stock changes are never overwritten by an edit.
+            val current = bookRepository.findById(id) ?: return@retryOnConflict null
+            bookRepository.update(
+                current.copy(
+                    title = title,
+                    author = author,
+                    category = bookCategory,
+                    publishedYear = publishedYear,
+                    edition = edition
+                )
             )
-        )
+        }
     }
 
-    override fun removeBook(id: Int): Boolean = bookRepository.delete(id)
+    override fun adjustBookQuantity(id: Int, change: Int): Book = retryOnConflict {
+        val current = getBookById(id)
+        bookRepository.update(current.withQuantityChangedBy(change))
+            ?: throw BookExceptions.BookNotFoundException(id)
+    }
+
+    // Any loan, returned or not, keeps the book; the FK catches a loan that races in after the check.
+    override fun removeBook(id: Int): Boolean {
+        if (loanRepository.existsByBookId(id)) throw BookExceptions.BookHasLoansException(id)
+        return try {
+            bookRepository.delete(id)
+        } catch (e: ReferencedRowException) {
+            throw BookExceptions.BookHasLoansException(id)
+        }
+    }
 
     private fun resolveAuthor(authorName: String) =
         authorRepository.findByName(authorName)

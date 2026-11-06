@@ -3,6 +3,7 @@ package org.example.service
 import org.example.model.AuthorExceptions
 import org.example.model.AuthorFilter
 import org.example.repository.InMemoryAuthorRepository
+import org.example.repository.InMemoryBookRepository
 import kotlin.test.*
 
 class AuthorServiceTest {
@@ -13,7 +14,7 @@ class AuthorServiceTest {
     @BeforeTest
     fun setUp() {
         repository = InMemoryAuthorRepository()
-        service    = AuthorService(repository)
+        service    = AuthorService(repository, InMemoryBookRepository())
     }
 
     // ─── getAllAuthors ────────────────────────────────────────────────────────

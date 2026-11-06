@@ -1,6 +1,7 @@
 package org.example.repository
 
 import org.example.database.UserTable
+import org.example.model.Role
 import org.example.model.User
 import org.example.model.UserFilter
 import org.jetbrains.exposed.sql.Database
@@ -181,6 +182,65 @@ class SQLiteUserRepositoryTest {
 
         assertNull(repository.findById(u1.id))
         assertNotNull(repository.findById(u2.id))
+    }
+
+    // ─── role ────────────────────────────────────────────────────────────────
+
+    @Test
+    fun `save and find round trip the role`() {
+        val admin = repository.save(User(name = "Ada", email = "ada@example.com", passwordHash = "h", role = Role.ADMIN))
+        val user  = repository.save(User(name = "Bob", email = "bob@example.com", passwordHash = "h"))
+
+        assertEquals(Role.ADMIN, repository.findById(admin.id)?.role)
+        assertEquals(Role.ADMIN, repository.findByEmail("ada@example.com")?.role)
+        assertEquals(Role.USER, repository.findById(user.id)?.role)
+        assertEquals(setOf(Role.ADMIN, Role.USER), repository.findAll(UserFilter(name = null)).data.map { it.role }.toSet())
+    }
+
+    @Test
+    fun `update never writes the role column`() {
+        val saved = repository.save(User(name = "Ada", email = "ada@example.com", passwordHash = "h"))
+
+        repository.update(saved.copy(name = "Ada L", role = Role.ADMIN))
+
+        val stored = repository.findById(saved.id)!!
+        assertEquals("Ada L", stored.name)
+        assertEquals(Role.USER, stored.role)
+    }
+
+    @Test
+    fun `update does not write back a stale role after updateRole`() {
+        val stale = repository.save(User(name = "Ada", email = "ada@example.com", passwordHash = "h", role = Role.ADMIN))
+        repository.updateRole(stale.id, Role.USER)
+
+        val returned = repository.update(stale.copy(name = "Ada L"))
+
+        assertEquals(Role.USER, returned?.role)
+        assertEquals(Role.USER, repository.findById(stale.id)?.role)
+    }
+
+    @Test
+    fun `updateRole changes only the role and reports success`() {
+        val saved = repository.save(User(name = "Ada", email = "ada@example.com", passwordHash = "h"))
+
+        assertTrue(repository.updateRole(saved.id, Role.ADMIN))
+
+        assertEquals(saved.copy(role = Role.ADMIN), repository.findById(saved.id))
+    }
+
+    @Test
+    fun `updateRole returns false when user does not exist`() {
+        assertFalse(repository.updateRole(999, Role.ADMIN))
+    }
+
+    @Test
+    fun `countByRole counts only users with that role`() {
+        repository.save(User(name = "A", email = "a@example.com", passwordHash = "h", role = Role.ADMIN))
+        repository.save(User(name = "B", email = "b@example.com", passwordHash = "h", role = Role.ADMIN))
+        repository.save(User(name = "C", email = "c@example.com", passwordHash = "h"))
+
+        assertEquals(2, repository.countByRole(Role.ADMIN))
+        assertEquals(1, repository.countByRole(Role.USER))
     }
 }
 

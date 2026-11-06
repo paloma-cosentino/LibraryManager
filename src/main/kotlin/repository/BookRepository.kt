@@ -11,4 +11,5 @@ interface BookRepository {
     fun save(book: Book): Book
     fun update(book: Book): Book?
     fun delete(id: Int): Boolean
+    fun existsByAuthorId(authorId: Int): Boolean
 }

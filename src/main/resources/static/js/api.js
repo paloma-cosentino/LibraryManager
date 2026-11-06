@@ -33,6 +33,25 @@ function currentUser() {
     return raw ? JSON.parse(raw) : null;
 }
 
+// The role always comes from the server: stored copies may be stale after a promotion/demotion.
+// Hiding controls is convenience only; the API enforces every permission.
+async function refreshCurrentUser() {
+    const response = await apiFetch("/auth/me");
+    if (!response.ok) return null;
+    const user = await response.json();
+    localStorage.setItem("user", JSON.stringify(user));
+    return user;
+}
+
+function isAdmin(user) {
+    return !!user && user.role === "ADMIN";
+}
+
+// Shows the server's explanation (e.g. 403/409) for an action that was refused.
+async function alertFailure(response, fallback) {
+    alert(await response.text() || fallback);
+}
+
 // Builds a "?a=1&b=2" query string, skipping empty/undefined/null values.
 function qs(params) {
     const entries = Object.entries(params)

@@ -10,7 +10,8 @@ import org.example.service.AuthorService
 import org.example.service.BookService
 import org.example.service.LoanService
 import org.example.service.UserService
-import org.http4k.core.Filter
+import org.http4k.core.then
+import org.http4k.filter.ServerFilters
 import org.http4k.routing.routes
 import org.http4k.server.Jetty
 import org.http4k.server.asServer
@@ -18,20 +19,26 @@ import org.http4k.server.asServer
 fun main() {
     val database         = DatabaseFactory.init()
     val authorRepository = SQLiteAuthorRepository(database)
-    val authorService    = AuthorService(authorRepository)
+    val bookRepository   = SQLiteBookRepository(database)
+    val loanRepository   = SQLiteLoanRepository(database)
+    val userRepository   = SQLiteUserRepository(database)
+
+    val authorService    = AuthorService(authorRepository, bookRepository)
     val authorHandler    = AuthorHandler(authorService)
 
-    val bookRepository = SQLiteBookRepository(database)
-    val bookService    = BookService(bookRepository, authorRepository)
+    val bookService    = BookService(bookRepository, authorRepository, loanRepository)
     val bookHandler    = BookHandler(bookService)
 
-    val loanRepository = SQLiteLoanRepository(database)
-    val loanService    = LoanService(bookRepository, loanRepository)
+    val loanService    = LoanService(bookRepository, loanRepository, userRepository)
     val loanHandler    = LoanHandler(loanService)
 
-    val userRepository = SQLiteUserRepository(database)
-    val userService    = UserService(userRepository)
+    val userService    = UserService(userRepository, loanRepository)
     val userHandler    = UserHandler(userService)
+
+    val unknownAdminEmails = userService.promoteAdmins(System.getenv("ADMIN_EMAILS")?.split(",").orEmpty())
+    if (unknownAdminEmails.isNotEmpty()) {
+        println("ADMIN_EMAILS entries with no matching account (not promoted): ${unknownAdminEmails.joinToString(", ")}")
+    }
 
     val uiHandler = UiHandler()
 
@@ -43,7 +50,7 @@ fun main() {
         authorRoutes(authorHandler),
         loanRoutes(loanHandler),
         userRoutes(userHandler)
-    ).withFilter(Filter(::authFilter))
+    ).withFilter(authFilter(userRepository))
 
     // A single flat `routes()` call lets http4k resolve 404 vs 405 correctly
     // across *all* registered routes, public and protected alike. Combining
@@ -51,11 +58,13 @@ fun main() {
     // soon as a path existed in both groups with different methods — e.g.
     // POST /users (public) made GET /users (protected) return a bare 405
     // instead of ever reaching the protected handler.
-    val app = routes(
+    // Outermost, so every request gets a fresh context (the authenticated Actor lives there)
+    // that is discarded when the request completes.
+    val app = ServerFilters.InitialiseRequestContext(requestContexts).then(routes(
         publicUserRoutes(userHandler),
         uiRoutes(uiHandler),
         protectedRoutes
-    )
+    ))
 
     app.asServer(Jetty(8080)).start()
 

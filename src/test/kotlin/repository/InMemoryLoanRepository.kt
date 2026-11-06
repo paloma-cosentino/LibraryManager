@@ -12,8 +12,9 @@ class InMemoryLoanRepository : LoanRepository {
     override fun findAll(filter: LoanFilter): PagedResult<Loan> {
         var result = loans.values.toList()
 
-        filter.borrowerName?.let { result = result.filter { l -> l.borrowerName.contains(it, ignoreCase = true) } }
+        filter.borrowerName?.let { result = result.filter { l -> l.borrower.name.contains(it, ignoreCase = true) } }
         filter.bookId?.let       { result = result.filter { l -> l.book.id == it } }
+        filter.userId?.let       { result = result.filter { l -> l.borrower.id == it } }
         if (filter.onlyActive)   result = result.filter { !it.isReturned }
 
         val total      = result.size
@@ -28,15 +29,25 @@ class InMemoryLoanRepository : LoanRepository {
 
     override fun findById(id: Int): Loan? = loans[id]
 
+    override fun findActiveByUserId(userId: Int): List<Loan> =
+        loans.values.filter { it.borrower.id == userId && !it.isReturned }.sortedBy { it.id }
+
+    override fun existsByUserId(userId: Int): Boolean = loans.values.any { it.borrower.id == userId }
+
+    override fun existsByBookId(bookId: Int): Boolean = loans.values.any { it.book.id == bookId }
+
     override fun save(loan: Loan): Loan {
-        val newLoan = loan.copy(id = nextId++)
+        val newLoan = loan.copy(id = nextId++, version = 0)
         loans[newLoan.id] = newLoan
         return newLoan
     }
 
     override fun update(loan: Loan): Loan {
-        loans[loan.id] = loan
-        return loan
+        val current = loans[loan.id] ?: return loan
+        if (current.version != loan.version) throw ConcurrentUpdateException("Loan", loan.id)
+        val updated = loan.copy(version = loan.version + 1)
+        loans[loan.id] = updated
+        return updated
     }
 }
 

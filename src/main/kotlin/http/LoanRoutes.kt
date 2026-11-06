@@ -13,6 +13,7 @@ import org.http4k.core.Request
 import org.http4k.core.Response
 import org.http4k.core.Status.Companion.CREATED
 import org.http4k.core.Status.Companion.OK
+import org.http4k.core.then
 import org.http4k.format.Jackson.auto
 import org.http4k.lens.Path
 import org.http4k.lens.Query
@@ -25,7 +26,7 @@ fun loanRoutes(handler: LoanHandler) = routes(
     "/loans"             bind GET   to handler.getAll,
     "/loans"             bind POST  to handler.borrow,
     "/loans/{id}"        bind GET   to handler.getById,
-    "/loans/{id}/return" bind PATCH to handler.returnBook
+    "/loans/{id}/return" bind PATCH to requireAdmin.then(handler.returnBook)
 )
 
 class LoanHandler(private val service: ILoanService) {
@@ -36,6 +37,7 @@ class LoanHandler(private val service: ILoanService) {
 
     private val borrowerQuery   = Query.optional("borrower")
     private val bookIdQuery     = Query.int().optional("bookId")
+    private val userIdQuery     = Query.int().optional("userId")
     private val onlyActiveQuery = Query.boolean().defaulted("onlyActive", false)
     private val pageQuery       = Query.int().defaulted("page", 1)
     private val sizeQuery       = Query.int().defaulted("size", 10)
@@ -46,21 +48,22 @@ class LoanHandler(private val service: ILoanService) {
             bookId       = bookIdQuery(request),
             onlyActive   = onlyActiveQuery(request),
             page         = pageQuery(request),
-            size         = sizeQuery(request)
+            size         = sizeQuery(request),
+            userId       = userIdQuery(request)
         )
-        pagedLoansLens(service.getAllLoans(filter), Response(OK))
+        pagedLoansLens(service.getAllLoans(actorLens(request), filter), Response(OK))
     }
 
     val getById: HttpHandler = { request: Request ->
         handleLoanExceptions {
-            loanLens(service.getLoanById(idPath(request)), Response(OK))
+            loanLens(service.getLoanById(actorLens(request), idPath(request)), Response(OK))
         }
     }
 
     val borrow: HttpHandler = { request: Request ->
         handleLoanExceptions {
             val body = loanRequestLens(request)
-            loanLens(service.borrowBook(body.bookId, body.borrowerName, body.daysToReturn), Response(CREATED))
+            loanLens(service.borrowBook(actorLens(request), body.bookId, body.userId, body.daysToReturn), Response(CREATED))
         }
     }
 

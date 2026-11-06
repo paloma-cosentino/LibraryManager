@@ -5,12 +5,14 @@ import org.example.model.PagedResult
 import org.example.model.User
 import org.example.model.UserFilter
 import org.example.model.UserResponse
+import org.example.model.toResponse
 import org.example.service.IUserService
 import org.http4k.core.Body
 import org.http4k.core.HttpHandler
 import org.http4k.core.Method.*
 import org.http4k.core.Response
 import org.http4k.core.Status
+import org.http4k.core.then
 import org.http4k.format.Jackson.auto
 import org.http4k.lens.Path
 import org.http4k.lens.Query
@@ -23,6 +25,7 @@ class UserHandler(private val service: IUserService) {
     private val userResponseLens = Body.auto<UserResponse>().toLens()
     private val updateUserRequestLens = Body.auto<UpdateUserRequest>().toLens()
     private val changePasswordRequestLens = Body.auto<ChangePasswordRequest>().toLens()
+    private val roleChangeRequestLens = Body.auto<RoleChangeRequest>().toLens()
     private val loginRequestLens = Body.auto<LoginRequest>().toLens()
     private val loginResponseLens = Body.auto<LoginResponse>().toLens()
     private val idPath   = Path.int().of("id")
@@ -43,7 +46,7 @@ class UserHandler(private val service: IUserService) {
         val result = service.getAllUsers(filter)
         // Never serialize the full User (and its passwordHash) over the wire.
         val response = PagedResult(
-            data = result.data.map { UserResponse(it.id, it.name, it.email) },
+            data = result.data.map { it.toResponse() },
             page = result.page,
             pageSize = result.pageSize,
             total = result.total,
@@ -54,11 +57,12 @@ class UserHandler(private val service: IUserService) {
 
     val getByEmail: HttpHandler = { request ->
         handleUserExceptions {
-            val user = service.getUserByEmail(emailQuery(request))
-            userResponseLens(UserResponse(user.id, user.name, user.email), Response.Companion(Status.OK))
+            val user = service.getUserByEmail(actorLens(request), emailQuery(request))
+            userResponseLens(user.toResponse(), Response.Companion(Status.OK))
         }
     }
 
+    // Only name/email/password are taken from the sign-up body; any "role" it carries is ignored.
     val create: HttpHandler = { request ->
         handleUserExceptions {
             val saved = service.addUser(
@@ -66,25 +70,31 @@ class UserHandler(private val service: IUserService) {
                 email = userLens(request).email,
                 password = userLens(request).passwordHash
             )
-            val response = UserResponse(saved.id, saved.name, saved.email)
-            userResponseLens(response, Response.Companion(Status.OK))
+            userResponseLens(saved.toResponse(), Response.Companion(Status.OK))
         }
     }
 
     val update: HttpHandler = { request ->
         handleUserExceptions {
             val body = updateUserRequestLens(request)
-            val updated = service.updateUserProfile(idPath(request), body.name, body.email)
+            val updated = service.updateUserProfile(actorLens(request), idPath(request), body.name, body.email)
             if (updated == null) Response.Companion(Status.NOT_FOUND)
-            else userResponseLens(UserResponse(updated.id, updated.name, updated.email), Response.Companion(Status.OK))
+            else userResponseLens(updated.toResponse(), Response.Companion(Status.OK))
         }
     }
 
     val changePassword: HttpHandler = { request ->
         handleUserExceptions {
             val body = changePasswordRequestLens(request)
-            service.changePassword(idPath(request), body.currentPassword, body.newPassword)
+            service.changePassword(actorLens(request), idPath(request), body.currentPassword, body.newPassword)
             Response.Companion(Status.NO_CONTENT)
+        }
+    }
+
+    val changeRole: HttpHandler = { request ->
+        handleUserExceptions {
+            val body = roleChangeRequestLens(request)
+            userResponseLens(service.changeRole(idPath(request), body.role).toResponse(), Response(Status.OK))
         }
     }
 
@@ -94,6 +104,14 @@ class UserHandler(private val service: IUserService) {
             else Response.Companion(Status.NOT_FOUND)
         }
     }
+    // Lets clients refresh their role from server state instead of trusting a stored copy.
+    val me: HttpHandler = { request ->
+        handleUserExceptions {
+            val user = service.getUserById(actorLens(request).userId)
+            userResponseLens(user.toResponse(), Response(Status.OK))
+        }
+    }
+
     val login: HttpHandler = { request ->
         val body = loginRequestLens(request)
         handleUserExceptions {
@@ -104,11 +122,13 @@ class UserHandler(private val service: IUserService) {
 }
 
 fun userRoutes(handler: UserHandler) = routes(
-    "/users" bind GET to handler.getAll,
+    "/auth/me" bind GET to handler.me,
+    "/users" bind GET to requireAdmin.then(handler.getAll),
     "/users/email" bind GET to handler.getByEmail,
     "/users/{id}" bind PUT to handler.update,
     "/users/{id}/password" bind PATCH to handler.changePassword,
-    "/users/{id}" bind DELETE to handler.delete,
+    "/users/{id}/role" bind PATCH to requireAdmin.then(handler.changeRole),
+    "/users/{id}" bind DELETE to requireAdmin.then(handler.delete),
 )
 
 fun publicUserRoutes(handler: UserHandler) = routes(

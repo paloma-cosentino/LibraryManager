@@ -10,4 +10,13 @@ object BookExceptions {
         "Invalid category [$value]. Valid values: ${BookCategory.entries.map { it.displayName }}"
     )
 
+    class InvalidQuantityException(quantity: Number) : IllegalArgumentException(
+        "Invalid quantity [$quantity]. Quantity must be between 0 and ${Int.MAX_VALUE}"
+    )
+
+    class InsufficientQuantityException(title: String, quantity: Int, change: Int) : IllegalArgumentException(
+        "Cannot change quantity of [$title] by [$change]: only [$quantity] in stock"
+    )
+
+    class BookHasLoansException(id: Int) : IllegalArgumentException("Book with id [$id] has loans and cannot be deleted")
 }

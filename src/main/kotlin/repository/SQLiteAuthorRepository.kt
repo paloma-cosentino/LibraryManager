@@ -68,7 +68,7 @@ class SQLiteAuthorRepository(private val database: Database) : AuthorRepository 
         if (updatedRows == 0) null else author
     }
 
-    override fun delete(id: Int): Boolean = transaction(database) {
-        AuthorTable.deleteWhere { AuthorTable.id eq id } > 0
+    override fun delete(id: Int): Boolean = translatingForeignKeyViolations("Author", id) {
+        transaction(database) { AuthorTable.deleteWhere { AuthorTable.id eq id } > 0 }
     }
 }

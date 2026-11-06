@@ -3,6 +3,7 @@ requireAuth();
 let currentPage = 1;
 const pageSize = 10;
 let totalPages = 1;
+let admin = false;
 
 function currentFilters() {
     return {
@@ -32,7 +33,7 @@ function renderBooks(books) {
     tbody.innerHTML = "";
 
     if (books.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" class="empty">No books found.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="${admin ? 7 : 6}" class="empty">No books found.</td></tr>`;
         return;
     }
 
@@ -45,26 +46,31 @@ function renderBooks(books) {
             <td>${book.quantity}</td>
             <td>${book.publishedYear ?? "—"}</td>
             <td>${book.edition ? escapeHtml(book.edition) : "—"}</td>
-            <td class="actions"></td>
         `;
-
-        const actionsCell = tr.querySelector(".actions");
-
-        const editBtn = document.createElement("button");
-        editBtn.type = "button";
-        editBtn.title = "Edit";
-        editBtn.textContent = "✏️";
-        editBtn.addEventListener("click", () => editBook(book));
-
-        const deleteBtn = document.createElement("button");
-        deleteBtn.type = "button";
-        deleteBtn.title = "Delete";
-        deleteBtn.textContent = "🗑️";
-        deleteBtn.addEventListener("click", () => deleteBook(book.id));
-
-        actionsCell.append(editBtn, deleteBtn);
+        if (admin) tr.appendChild(adminActions(book));
         tbody.appendChild(tr);
     });
+}
+
+// Edit (incl. the stock-change control inside the edit modal) and delete are ADMIN-only.
+function adminActions(book) {
+    const actionsCell = document.createElement("td");
+    actionsCell.className = "actions";
+
+    const editBtn = document.createElement("button");
+    editBtn.type = "button";
+    editBtn.title = "Edit";
+    editBtn.textContent = "✏️";
+    editBtn.addEventListener("click", () => editBook(book));
+
+    const deleteBtn = document.createElement("button");
+    deleteBtn.type = "button";
+    deleteBtn.title = "Delete";
+    deleteBtn.textContent = "🗑️";
+    deleteBtn.addEventListener("click", () => deleteBook(book.id));
+
+    actionsCell.append(editBtn, deleteBtn);
+    return actionsCell;
 }
 
 function changePage(delta) {
@@ -79,10 +85,19 @@ function applyFilters() {
     loadBooks();
 }
 
+// Create sets absolute stock; edit shows current stock read-only and changes it by a relative amount
+// (PATCH), so an edit can never overwrite stock moved by concurrent borrows/returns.
+function setQuantityMode(editing) {
+    document.getElementById("quantity").readOnly = editing;
+    document.getElementById("quantityChangeGroup").hidden = !editing;
+    document.getElementById("quantityChange").value = "0";
+}
+
 function openCreateModal() {
     document.getElementById("modalTitle").textContent = "Add Book";
     document.getElementById("bookForm").reset();
     document.getElementById("bookId").value = "";
+    setQuantityMode(false);
     document.getElementById("bookFormError").textContent = "";
     document.getElementById("bookModal").classList.remove("hidden");
 }
@@ -94,6 +109,7 @@ function editBook(book) {
     document.getElementById("author").value = book.author.name;
     document.getElementById("category").value = book.category;
     document.getElementById("quantity").value = book.quantity;
+    setQuantityMode(true);
     document.getElementById("publishedYear").value = book.publishedYear ?? "";
     document.getElementById("edition").value = book.edition ?? "";
     document.getElementById("bookFormError").textContent = "";
@@ -106,35 +122,76 @@ function closeModal() {
 
 async function deleteBook(id) {
     if (!confirm("Remove this book?")) return;
-    await apiFetch(`/books/${id}`, { method: "DELETE" });
+    const response = await apiFetch(`/books/${id}`, { method: "DELETE" });
+    if (!response.ok) await alertFailure(response, "Error deleting book.");
     loadBooks();
+}
+
+function showFormError(message) {
+    document.getElementById("bookFormError").textContent = message;
+}
+
+async function createBook(details) {
+    const payload = { ...details, quantity: parseInt(document.getElementById("quantity").value, 10) };
+    const response = await apiFetch("/books", { method: "POST", body: JSON.stringify(payload) });
+    if (!response.ok) {
+        showFormError(await response.text() || "Error saving book.");
+        return false;
+    }
+    return true;
+}
+
+async function updateBook(id, details) {
+    const detailsResponse = await apiFetch(`/books/${id}`, { method: "PUT", body: JSON.stringify(details) });
+    if (!detailsResponse.ok) {
+        showFormError(await detailsResponse.text() || "Error saving book.");
+        return false;
+    }
+
+    const change = parseInt(document.getElementById("quantityChange").value, 10) || 0;
+    if (change === 0) return true;
+
+    const stockResponse = await apiFetch(`/books/${id}/quantity`, {
+        method: "PATCH",
+        body: JSON.stringify({ change })
+    });
+    if (!stockResponse.ok) {
+        // Details are already saved: say so, keep the modal open, and show the saved details behind it.
+        showFormError(`Details saved, but stock change failed: ${await stockResponse.text() || stockResponse.status}`);
+        loadBooks();
+        return false;
+    }
+    return true;
 }
 
 document.getElementById("bookForm").addEventListener("submit", async (e) => {
     e.preventDefault();
 
     const id = document.getElementById("bookId").value;
-    const payload = {
+    const details = {
         title: document.getElementById("title").value,
         author: document.getElementById("author").value,
         category: document.getElementById("category").value,
-        quantity: parseInt(document.getElementById("quantity").value, 10),
         publishedYear: document.getElementById("publishedYear").value
             ? parseInt(document.getElementById("publishedYear").value, 10) : null,
         edition: document.getElementById("edition").value || null
     };
 
-    const response = id
-        ? await apiFetch(`/books/${id}`, { method: "PUT", body: JSON.stringify(payload) })
-        : await apiFetch("/books", { method: "POST", body: JSON.stringify(payload) });
-
-    if (response.ok) {
+    showFormError("");
+    const saved = id ? await updateBook(id, details) : await createBook(details);
+    if (saved) {
         closeModal();
         loadBooks();
-    } else {
-        document.getElementById("bookFormError").textContent = await response.text() || "Error saving book.";
     }
 });
 
-loadBooks();
+async function init() {
+    admin = isAdmin(await refreshCurrentUser());
+    document.getElementById("addBookBtn").hidden = !admin;
+    document.getElementById("actionsHeader").hidden = !admin;
+    loadBooks();
+}
+
+init();
+
 

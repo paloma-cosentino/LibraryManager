@@ -1,14 +1,19 @@
 package org.example.http
 
+import org.example.model.Actor
 import org.example.model.LoginResponse
 import org.example.model.PagedResult
+import org.example.model.Role
 import org.example.model.UserResponse
+import org.example.repository.InMemoryLoanRepository
 import org.example.repository.InMemoryUserRepository
 import org.example.service.UserService
 import org.http4k.core.Body
 import org.http4k.core.HttpHandler
 import org.http4k.core.Method.*
 import org.http4k.core.Request
+import org.http4k.core.then
+import org.http4k.filter.ServerFilters
 import org.http4k.core.Status.Companion.CONFLICT
 import org.http4k.core.Status.Companion.NOT_FOUND
 import org.http4k.core.Status.Companion.NO_CONTENT
@@ -21,19 +26,23 @@ import kotlin.test.*
 class UserHandlerTest {
 
     private lateinit var app: HttpHandler
+    private lateinit var unauthenticatedApp: HttpHandler
     private lateinit var authApp: HttpHandler
+    private lateinit var repository: InMemoryUserRepository
     private val userResponseLens  = Body.auto<UserResponse>().toLens()
     private val pagedUsersLens    = Body.auto<PagedResult<UserResponse>>().toLens()
     private val loginResponseLens = Body.auto<LoginResponse>().toLens()
 
     @BeforeTest
     fun setUp() {
-        val service = UserService(InMemoryUserRepository())
+        repository = InMemoryUserRepository()
+        val service = UserService(repository, InMemoryLoanRepository())
         val handler = UserHandler(service)
         val public  = publicUserRoutes(handler)
         val protected = userRoutes(handler)
         authApp = public
-        app     = routes(public, protected)
+        unauthenticatedApp = routes(public, protected)
+        app     = unauthenticatedApp.asActor(anAdmin)
     }
 
 
@@ -45,6 +54,11 @@ class UserHandlerTest {
                 .header("Content-Type", "application/json")
                 .body("""{"id":0,"name":"$name","email":"$email","passwordHash":"$password"}""")
         )
+
+    private fun authenticated(handler: HttpHandler) =
+        ServerFilters.InitialiseRequestContext(requestContexts).then(authFilter(repository)).then(handler)
+
+    private fun asSelf(id: Int) = unauthenticatedApp.asActor(Actor(id, Role.USER))
 
     private fun postLogin(email: String, password: String) =
         authApp(
@@ -210,7 +224,7 @@ class UserHandlerTest {
     fun `PATCH users password returns 204 and allows login with the new password`() {
         val created = userResponseLens(postUser("Alice", "alice@example.com", "senha123"))
 
-        val changeResponse = app(
+        val changeResponse = asSelf(created.id)(
             Request(PATCH, "/users/${created.id}/password")
                 .header("Content-Type", "application/json")
                 .body("""{"currentPassword":"senha123","newPassword":"novaSenha456"}""")
@@ -224,7 +238,7 @@ class UserHandlerTest {
     fun `PATCH users password returns 401 when current password is wrong`() {
         val created = userResponseLens(postUser("Alice", "alice@example.com", "senha123"))
 
-        val response = app(
+        val response = asSelf(created.id)(
             Request(PATCH, "/users/${created.id}/password")
                 .header("Content-Type", "application/json")
                 .body("""{"currentPassword":"wrongPassword","newPassword":"novaSenha456"}""")
@@ -235,7 +249,7 @@ class UserHandlerTest {
 
     @Test
     fun `PATCH users password returns 404 when user does not exist`() {
-        val response = app(
+        val response = asSelf(999)(
             Request(PATCH, "/users/999/password")
                 .header("Content-Type", "application/json")
                 .body("""{"currentPassword":"whatever","newPassword":"novaSenha456"}""")
@@ -294,8 +308,47 @@ class UserHandlerTest {
     // ─── authFilter — rotas protegidas ────────────────────────────────────────
 
     @Test
+    fun `POST auth login returns the stored role and no passwordHash`() {
+        postUser("Alice", "alice@example.com", "senha123")
+        repository.updateRole(repository.findByEmail("alice@example.com")!!.id, Role.ADMIN)
+
+        val response = postLogin("alice@example.com", "senha123")
+
+        assertEquals(Role.ADMIN, loginResponseLens(response).user.role)
+        assertFalse(response.bodyString().contains("passwordHash"))
+        assertFalse(response.bodyString().contains("senha123"))
+    }
+
+    @Test
+    fun `GET users items include each stored role and no passwordHash`() {
+        postUser("Alice", "alice@example.com")
+        postUser("Bob", "bob@example.com")
+        repository.updateRole(repository.findByEmail("alice@example.com")!!.id, Role.ADMIN)
+
+        val response = app(Request(GET, "/users"))
+
+        assertEquals(
+            mapOf("alice@example.com" to Role.ADMIN, "bob@example.com" to Role.USER),
+            pagedUsersLens(response).data.associate { it.email to it.role }
+        )
+        assertFalse(response.bodyString().contains("passwordHash"))
+    }
+
+    @Test
+    fun `POST users ignores a requested ADMIN role and creates a USER`() {
+        val response = authApp(
+            Request(POST, "/users")
+                .header("Content-Type", "application/json")
+                .body("""{"id":0,"name":"Mallory","email":"mallory@example.com","passwordHash":"senha123","role":"ADMIN"}""")
+        )
+
+        assertEquals(OK, response.status)
+        assertEquals(Role.USER, repository.findByEmail("mallory@example.com")?.role)
+    }
+
+    @Test
     fun `protected route returns 401 without token`() {
-        val protectedApp = authFilter(app)
+        val protectedApp = authenticated(unauthenticatedApp)
 
         val response = protectedApp(Request(GET, "/users"))
 
@@ -304,7 +357,7 @@ class UserHandlerTest {
 
     @Test
     fun `protected route returns 401 with invalid token`() {
-        val protectedApp = authFilter(app)
+        val protectedApp = authenticated(unauthenticatedApp)
 
         val response = protectedApp(
             Request(GET, "/users")
@@ -319,12 +372,32 @@ class UserHandlerTest {
         postUser("Alice", "alice@example.com", "senha123")
         val token = loginResponseLens(postLogin("alice@example.com", "senha123")).token
 
-        val protectedApp = authFilter(app)
+        val protectedApp = authenticated(unauthenticatedApp)
         val response = protectedApp(
-            Request(GET, "/users")
+            Request(GET, "/auth/me")
                 .header("Authorization", "Bearer $token")
         )
 
         assertEquals(OK, response.status)
+    }
+
+    @Test
+    fun `GET auth me returns the authenticated user with current role and no passwordHash`() {
+        postUser("Alice", "alice@example.com", "senha123")
+        postUser("Bob", "bob@example.com", "senha123")
+        val token = loginResponseLens(postLogin("alice@example.com", "senha123")).token
+        val alice = repository.findByEmail("alice@example.com")!!
+        repository.updateRole(alice.id, Role.ADMIN)
+
+        val response = authenticated(unauthenticatedApp)(Request(GET, "/auth/me").header("Authorization", "Bearer $token"))
+
+        assertEquals(OK, response.status)
+        assertEquals(UserResponse(alice.id, "Alice", "alice@example.com", Role.ADMIN), userResponseLens(response))
+        assertFalse(response.bodyString().contains("passwordHash"))
+    }
+
+    @Test
+    fun `GET auth me returns 401 without token`() {
+        assertEquals(UNAUTHORIZED, authenticated(unauthenticatedApp)(Request(GET, "/auth/me")).status)
     }
 }

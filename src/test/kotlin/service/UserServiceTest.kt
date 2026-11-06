@@ -1,17 +1,22 @@
 package org.example.service
 
+import org.example.model.Actor
+import org.example.model.Role
 import org.example.model.UserExceptions
 import org.example.model.UserFilter
+import org.example.repository.InMemoryLoanRepository
 import org.example.repository.InMemoryUserRepository
 import kotlin.test.*
 
 class UserServiceTest {
 
     private lateinit var service: UserService
+    private val admin = Actor(userId = 1001, role = Role.ADMIN)
+    private fun self(id: Int) = Actor(userId = id, role = Role.USER)
 
     @BeforeTest
     fun setUp() {
-        service = UserService(InMemoryUserRepository())
+        service = UserService(InMemoryUserRepository(), InMemoryLoanRepository())
     }
 
     // ─── getAllUsers ──────────────────────────────────────────────────────────
@@ -65,7 +70,7 @@ class UserServiceTest {
     fun `getUserByEmail returns user when email matches`() {
         service.addUser("Alice", "alice@example.com", "senha123")
 
-        val found = service.getUserByEmail("alice@example.com")
+        val found = service.getUserByEmail(admin, "alice@example.com")
 
         assertEquals("alice@example.com", found.email)
     }
@@ -73,7 +78,7 @@ class UserServiceTest {
     @Test
     fun `getUserByEmail throws UserEmailNotFoundException when email does not match`() {
         assertFailsWith<UserExceptions.UserEmailNotFoundException> {
-            service.getUserByEmail("nobody@example.com")
+            service.getUserByEmail(admin, "nobody@example.com")
         }
     }
 
@@ -137,7 +142,7 @@ class UserServiceTest {
     @Test
     fun `updateUserProfile changes name and email`() {
         val added   = service.addUser("Alice", "alice@example.com", "senha123")
-        val updated = service.updateUserProfile(added.id, "Alice Updated", "updated@example.com")
+        val updated = service.updateUserProfile(admin, added.id, "Alice Updated", "updated@example.com")
 
         assertNotNull(updated)
         assertEquals("Alice Updated", updated.name)
@@ -147,7 +152,7 @@ class UserServiceTest {
     @Test
     fun `updateUserProfile does not change passwordHash`() {
         val added   = service.addUser("Alice", "alice@example.com", "senha123")
-        val updated = service.updateUserProfile(added.id, "Alice Updated", "updated@example.com")
+        val updated = service.updateUserProfile(admin, added.id, "Alice Updated", "updated@example.com")
 
         assertNotNull(updated)
         assertEquals(added.passwordHash, updated.passwordHash)
@@ -155,7 +160,7 @@ class UserServiceTest {
 
     @Test
     fun `updateUserProfile returns null when user does not exist`() {
-        assertNull(service.updateUserProfile(999, "Ghost", "ghost@example.com"))
+        assertNull(service.updateUserProfile(admin, 999, "Ghost", "ghost@example.com"))
     }
 
     // ─── changePassword ──────────────────────────────────────────────────────
@@ -164,7 +169,7 @@ class UserServiceTest {
     fun `changePassword allows login with the new password`() {
         val added = service.addUser("Alice", "alice@example.com", "senha123")
 
-        service.changePassword(added.id, "senha123", "novaSenha456")
+        service.changePassword(self(added.id), added.id, "senha123", "novaSenha456")
 
         val response = service.login("alice@example.com", "novaSenha456")
         assertTrue(response.token.isNotBlank())
@@ -173,7 +178,7 @@ class UserServiceTest {
     @Test
     fun `changePassword rejects the old password after it was changed`() {
         val added = service.addUser("Alice", "alice@example.com", "senha123")
-        service.changePassword(added.id, "senha123", "novaSenha456")
+        service.changePassword(self(added.id), added.id, "senha123", "novaSenha456")
 
         assertFailsWith<UserExceptions.InvalidCredentialsException> {
             service.login("alice@example.com", "senha123")
@@ -185,21 +190,21 @@ class UserServiceTest {
         val added = service.addUser("Alice", "alice@example.com", "senha123")
 
         assertFailsWith<UserExceptions.InvalidCredentialsException> {
-            service.changePassword(added.id, "wrongPassword", "novaSenha456")
+            service.changePassword(self(added.id), added.id, "wrongPassword", "novaSenha456")
         }
     }
 
     @Test
     fun `changePassword throws UserIdNotFoundException when user does not exist`() {
         assertFailsWith<UserExceptions.UserIdNotFoundException> {
-            service.changePassword(999, "whatever", "novaSenha456")
+            service.changePassword(self(999), 999, "whatever", "novaSenha456")
         }
     }
 
     @Test
     fun `changePassword stores a bcrypt hash not the plain new password`() {
         val added = service.addUser("Alice", "alice@example.com", "senha123")
-        service.changePassword(added.id, "senha123", "novaSenha456")
+        service.changePassword(self(added.id), added.id, "senha123", "novaSenha456")
 
         val stored = service.getUserById(added.id)
         assertNotEquals("novaSenha456", stored.passwordHash)

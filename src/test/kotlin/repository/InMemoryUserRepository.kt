@@ -1,6 +1,7 @@
 package org.example.repository
 
 import org.example.model.PagedResult
+import org.example.model.Role
 import org.example.model.User
 import org.example.model.UserFilter
 import kotlin.math.ceil
@@ -33,11 +34,21 @@ class InMemoryUserRepository : UserRepository {
         return saved
     }
 
+    // Mirrors SQLiteUserRepository: update never writes role; the stored role wins.
     override fun update(user: User): User? {
-        if (!users.containsKey(user.id)) return null
-        users[user.id] = user
-        return user
+        val current = users[user.id] ?: return null
+        val updated = user.copy(role = current.role)
+        users[user.id] = updated
+        return updated
     }
+
+    override fun updateRole(id: Int, role: Role): Boolean {
+        val current = users[id] ?: return false
+        users[id] = current.copy(role = role)
+        return true
+    }
+
+    override fun countByRole(role: Role): Int = users.values.count { it.role == role }
 
     override fun delete(id: Int): Boolean = users.remove(id) != null
 }

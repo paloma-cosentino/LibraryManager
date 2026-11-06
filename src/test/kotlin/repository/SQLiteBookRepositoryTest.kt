@@ -185,6 +185,35 @@ class SQLiteBookRepositoryTest {
     }
 
     @Test
+    fun `update increments version and persists it`() {
+        val author = insertAuthor("Robert C. Martin")
+        val saved = repository.save(Book(0, "Clean Code", author, BookCategory.TECHNOLOGY, 3))
+
+        val updated = repository.update(saved.copy(quantity = 10))
+
+        assertEquals(0, saved.version)
+        assertEquals(1, updated?.version)
+        assertEquals(1, repository.findById(saved.id)?.version)
+    }
+
+    @Test
+    fun `stale update from an independent connection throws ConcurrentUpdateException`() {
+        val author = insertAuthor("Robert C. Martin")
+        val saved = repository.save(Book(0, "Clean Code", author, BookCategory.TECHNOLOGY, 3))
+        val otherRepository = SQLiteBookRepository(
+            Database.connect("jdbc:sqlite:${dbFile.absolutePath}", driver = "org.sqlite.JDBC")
+        )
+        val staleCopy = otherRepository.findById(saved.id)!!
+
+        repository.update(saved.copy(quantity = 2))
+
+        assertFailsWith<ConcurrentUpdateException> {
+            otherRepository.update(staleCopy.copy(quantity = 10))
+        }
+        assertEquals(2, repository.findById(saved.id)?.quantity)
+    }
+
+    @Test
     fun `update returns null when book does not exist`() {
         val author = insertAuthor("Nobody")
         val nonExistent = Book(999, "Ghost Book", author, BookCategory.FICTION, 0)
@@ -221,5 +250,15 @@ class SQLiteBookRepositoryTest {
 
         assertNull(repository.findById(book1.id))
         assertNotNull(repository.findById(book2.id))
+    }
+
+    @Test
+    fun `existsByAuthorId reports whether the author has any book`() {
+        val robert = insertAuthor("Robert C. Martin")
+        val david  = insertAuthor("David Thomas")
+        repository.save(Book(0, "Clean Code", robert, BookCategory.TECHNOLOGY, 3))
+
+        assertTrue(repository.existsByAuthorId(robert.id))
+        assertFalse(repository.existsByAuthorId(david.id))
     }
 }

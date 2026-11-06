@@ -13,7 +13,6 @@ fun IBookService.updateBook(
     id: Int,
     title: String,
     authorName: String,
-    category: String,
-    quantity: Int
-): Book? = updateBook(id, title, authorName, category, quantity, publishedYear = null, edition = null)
+    category: String
+): Book? = updateBook(id, title, authorName, category, publishedYear = null, edition = null)
 
