@@ -13,4 +13,8 @@ object BookExceptions {
     class InvalidQuantityException(quantity: Number) : IllegalArgumentException(
         "Invalid quantity [$quantity]. Quantity must be between 0 and ${Int.MAX_VALUE}"
     )
+
+    class InsufficientQuantityException(title: String, quantity: Int, change: Int) : IllegalArgumentException(
+        "Cannot change quantity of [$title] by [$change]: only [$quantity] in stock"
+    )
 }
