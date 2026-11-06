@@ -8,7 +8,8 @@ data class Loan(
     val borrowerName: String,       // stub — vira FK de User no futuro
     val borrowedAt: LocalDate,
     val dueDate: LocalDate,
-    val returnedAt: LocalDate? = null
+    val returnedAt: LocalDate? = null,
+    val version: Int = 0
 ) {
     val isReturned get() = returnedAt != null
     val isOverdue  get() = !isReturned && LocalDate.now().isAfter(dueDate)

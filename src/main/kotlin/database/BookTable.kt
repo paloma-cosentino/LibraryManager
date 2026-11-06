@@ -10,6 +10,7 @@ object BookTable: Table("books") {
     val quantity = integer("quantity")
     val publishedYear = integer("published_year").nullable()
     val edition = varchar("edition", 255).nullable()
+    val version = integer("version").default(0)
 
     override val primaryKey = PrimaryKey(id)
 }

@@ -57,17 +57,20 @@ class BookService(
     ): Book? {
         val author = resolveAuthor(authorName)
         val bookCategory = resolveCategory(category)
-        return bookRepository.update(
-            Book(
-                id = id,
-                title = title,
-                author = author,
-                category = bookCategory,
-                quantity = quantity,
-                publishedYear = publishedYear,
-                edition = edition
+        return retryOnConflict {
+            // Re-read on every attempt so the write carries the current version.
+            val current = bookRepository.findById(id) ?: return@retryOnConflict null
+            bookRepository.update(
+                current.copy(
+                    title = title,
+                    author = author,
+                    category = bookCategory,
+                    quantity = quantity,
+                    publishedYear = publishedYear,
+                    edition = edition
+                )
             )
-        )
+        }
     }
 
     override fun removeBook(id: Int): Boolean = bookRepository.delete(id)

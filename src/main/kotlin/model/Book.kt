@@ -8,6 +8,7 @@ data class Book(
     val quantity: Int,
     val publishedYear: Int? = null,
     val edition: String? = null,
+    val version: Int = 0,
 ) {
     fun withQuantityChangedBy(change: Int): Book {
         // Widened so Int overflow can never wrap into a negative (or falsely valid) stock level.

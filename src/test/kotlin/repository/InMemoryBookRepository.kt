@@ -30,19 +30,20 @@ class InMemoryBookRepository : BookRepository {
         books.values.firstOrNull { it.title == title && it.author.id == authorId }
 
     override fun save(book: Book): Book {
-        val newBook = book.copy(id = nextId++)
+        val newBook = book.copy(id = nextId++, version = 0)
         books[newBook.id] = newBook
         return newBook
     }
 
     override fun update(book: Book): Book? {
-        if (!books.containsKey(book.id)) return null
-        books[book.id] = book
-        return book
+        val current = books[book.id] ?: return null
+        if (current.version != book.version) throw ConcurrentUpdateException("Book", book.id)
+        val updated = book.copy(version = book.version + 1)
+        books[book.id] = updated
+        return updated
     }
 
     override fun delete(id: Int): Boolean {
         return books.remove(id) != null
     }
-
 }

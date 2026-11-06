@@ -11,6 +11,7 @@ import org.example.model.LoanFilter
 import org.example.model.PagedResult
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.ResultRow
+import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.andWhere
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
@@ -29,12 +30,14 @@ class SQLiteLoanRepository(private val database: Database) : LoanRepository{
             category = BookCategory.entries.first {  it.displayName == this[BookTable.category]  },
             quantity = this[BookTable.quantity],
             publishedYear = this[BookTable.publishedYear],
-            edition = this[BookTable.edition]
+            edition = this[BookTable.edition],
+            version = this[BookTable.version]
         ),
         borrowerName = this[LoanTable.borrowerName],
         borrowedAt = LocalDate.parse(this[LoanTable.borrowedAt]),
         dueDate = LocalDate.parse(this[LoanTable.dueDate]),
-        returnedAt = this[LoanTable.returnedAt]?.let { LocalDate.parse(it) }
+        returnedAt = this[LoanTable.returnedAt]?.let { LocalDate.parse(it) },
+        version = this[LoanTable.version]
     )
     override fun findAll(filter: LoanFilter): PagedResult<Loan> = transaction(database) {
         var query = (LoanTable innerJoin BookTable innerJoin AuthorTable).selectAll()
@@ -74,19 +77,28 @@ class SQLiteLoanRepository(private val database: Database) : LoanRepository{
                 it[borrowedAt] = loan.borrowedAt.toString()
                 it[dueDate] = loan.dueDate.toString()
                 it[returnedAt] = loan.returnedAt?.toString()
-            }[LoanTable.id]
+                it[version] = 0
+            }[LoanTable.id],
+            version = 0
         )
     }
 
     override fun update(loan: Loan): Loan = transaction(database) {
-        LoanTable.update({ LoanTable.id eq loan.id }) {
+        val nextVersion = loan.version + 1
+        val updatedRows = LoanTable.update({ (LoanTable.id eq loan.id) and (LoanTable.version eq loan.version) }) {
             it[bookId] = loan.book.id
             it[borrowerName] = loan.borrowerName
             it[borrowedAt] = loan.borrowedAt.toString()
             it[dueDate] = loan.dueDate.toString()
             it[returnedAt] = loan.returnedAt?.toString()
+            it[version] = nextVersion
         }
-        loan
+        when {
+            updatedRows > 0 -> loan.copy(version = nextVersion)
+            // Missing loan keeps the pre-existing contract: echo the input unchanged.
+            LoanTable.selectAll().where { LoanTable.id eq loan.id }.empty() -> loan
+            else -> throw ConcurrentUpdateException("Loan", loan.id)
+        }
     }
 
 }

@@ -179,6 +179,16 @@ class BookServiceTest {
     }
 
     @Test
+    fun `updateBook on a book that was already written succeeds`() {
+        val added = service.addBook("Clean Code", "Robert C. Martin", "Technology", 3)
+        service.updateBook(added.id, "Clean Code 2nd Ed", added.author.name, added.category.displayName, 3)
+
+        val updated = service.updateBook(added.id, "Clean Code 3rd Ed", added.author.name, added.category.displayName, 3)
+
+        assertEquals("Clean Code 3rd Ed", updated?.title)
+    }
+
+    @Test
     fun `updateBook returns null when book does not exist`() {
         assertNull(service.updateBook(999, "Ghost Book", "Robert C. Martin", "Fiction", 0))
     }

@@ -20,13 +20,16 @@ class LoanService(
         return loanRepository.findById(id)
             ?: throw LoanExceptions.LoanNotFoundException(id)
     }
-    override fun borrowBook (bookId: Int, borrowerName: String, daysToReturn: Int): Loan {
-        val book = bookRepository.findById(bookId)
-            ?: throw BookExceptions.BookNotFoundException(bookId)
-        if (book.quantity <= 0 ){
-            throw LoanExceptions.BookNotAvailableException(book.title)
+
+    override fun borrowBook(bookId: Int, borrowerName: String, daysToReturn: Int): Loan {
+        val book = findBook(bookId)
+        retryOnConflict {
+            // Re-read on every attempt: availability must be judged against the latest committed stock.
+            val current = findBook(bookId)
+            if (current.quantity <= 0) throw LoanExceptions.BookNotAvailableException(current.title)
+            bookRepository.update(current.withQuantityChangedBy(-1))
+                ?: throw BookExceptions.BookNotFoundException(bookId)
         }
-        bookRepository.update(book.copy(quantity = book.quantity - 1))
 
         val loan = Loan(
             book = book,
@@ -36,18 +39,29 @@ class LoanService(
         )
         return loanRepository.save(loan)
     }
+
+    private fun findBook(bookId: Int) =
+        bookRepository.findById(bookId) ?: throw BookExceptions.BookNotFoundException(bookId)
+
     override fun returnBook(loanId: Int): Loan {
         val loan = loanRepository.findById(loanId)
             ?: throw LoanExceptions.LoanNotFoundException(loanId)
         if (loan.isReturned)
             throw LoanExceptions.LoanAlreadyReturnedException(loanId)
 
-        val currentBook = bookRepository.findById(loan.book.id)
-            ?: throw BookExceptions.BookNotFoundException(loan.book.id)
-        bookRepository.update(currentBook.copy(quantity = currentBook.quantity + 1))
-
-        return loanRepository.update(loan.copy(returnedAt = LocalDate.now()))
-
-
+        findBook(loan.book.id)
+        // Mark returned before restocking: a crash between the two writes under-counts stock
+        // rather than letting a loan be returned (and restocked) twice.
+        val returned = retryOnConflict {
+            val current = loanRepository.findById(loanId)
+                ?: throw LoanExceptions.LoanNotFoundException(loanId)
+            if (current.isReturned) throw LoanExceptions.LoanAlreadyReturnedException(loanId)
+            loanRepository.update(current.copy(returnedAt = LocalDate.now()))
+        }
+        retryOnConflict {
+            bookRepository.update(findBook(loan.book.id).withQuantityChangedBy(+1))
+                ?: throw BookExceptions.BookNotFoundException(loan.book.id)
+        }
+        return returned
     }
 }

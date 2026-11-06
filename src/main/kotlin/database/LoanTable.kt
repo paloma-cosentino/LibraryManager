@@ -9,6 +9,7 @@ object LoanTable: Table("loans") {
     val borrowedAt   = varchar("borrowed_at", 10)   // ISO date: "2026-04-07"
     val dueDate      = varchar("due_date", 10)
     val returnedAt   = varchar("returned_at", 10).nullable()
+    val version      = integer("version").default(0)
 
     override val primaryKey = PrimaryKey(id)
 }

@@ -29,14 +29,17 @@ class InMemoryLoanRepository : LoanRepository {
     override fun findById(id: Int): Loan? = loans[id]
 
     override fun save(loan: Loan): Loan {
-        val newLoan = loan.copy(id = nextId++)
+        val newLoan = loan.copy(id = nextId++, version = 0)
         loans[newLoan.id] = newLoan
         return newLoan
     }
 
     override fun update(loan: Loan): Loan {
-        loans[loan.id] = loan
-        return loan
+        val current = loans[loan.id] ?: return loan
+        if (current.version != loan.version) throw ConcurrentUpdateException("Loan", loan.id)
+        val updated = loan.copy(version = loan.version + 1)
+        loans[loan.id] = updated
+        return updated
     }
 }
 

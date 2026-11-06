@@ -179,6 +179,39 @@ class SQLiteLoanRepositoryTest {
         assertEquals(today, fromDb?.returnedAt)
     }
 
+    @Test
+    fun `update increments loan version and findById maps loan and book versions`() {
+        val author = insertAuthor("Frank Herbert")
+        val book   = insertBook("Dune", author)
+        bookRepository.update(book.copy(quantity = 2))
+        val saved  = insertLoan(book)
+
+        val updated = repository.update(saved.copy(returnedAt = LocalDate.now()))
+
+        assertEquals(1, updated.version)
+        val fromDb = repository.findById(saved.id)
+        assertEquals(1, fromDb?.version)
+        assertEquals(1, fromDb?.book?.version)
+    }
+
+    @Test
+    fun `stale loan update from an independent connection throws ConcurrentUpdateException`() {
+        val author = insertAuthor("Frank Herbert")
+        val saved  = insertLoan(insertBook("Dune", author))
+        val otherRepository = SQLiteLoanRepository(
+            Database.connect("jdbc:sqlite:${dbFile.absolutePath}", driver = "org.sqlite.JDBC")
+        )
+        val staleCopy = otherRepository.findById(saved.id)!!
+        val firstReturn = LocalDate.now()
+
+        repository.update(saved.copy(returnedAt = firstReturn))
+
+        assertFailsWith<ConcurrentUpdateException> {
+            otherRepository.update(staleCopy.copy(returnedAt = firstReturn.plusDays(1)))
+        }
+        assertEquals(firstReturn, repository.findById(saved.id)?.returnedAt)
+    }
+
     // ─── pagination ───────────────────────────────────────────────────────────
 
     @Test
@@ -195,4 +228,3 @@ class SQLiteLoanRepositoryTest {
         assertEquals(3,  page2.totalPages)
     }
 }
-

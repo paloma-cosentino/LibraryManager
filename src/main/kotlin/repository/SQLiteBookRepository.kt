@@ -23,7 +23,8 @@ class SQLiteBookRepository(private val database: Database): BookRepository {
         category = BookCategory.entries.first { it.displayName == this[BookTable.category] },
         quantity = this[BookTable.quantity],
         publishedYear = this[BookTable.publishedYear],
-        edition = this[BookTable.edition]
+        edition = this[BookTable.edition],
+        version = this[BookTable.version]
     )
 
 
@@ -72,20 +73,28 @@ class SQLiteBookRepository(private val database: Database): BookRepository {
                 it[quantity] = book.quantity
                 it[publishedYear] = book.publishedYear
                 it[edition] = book.edition
-            }[BookTable.id]
+                it[version] = 0
+            }[BookTable.id],
+            version = 0
         )
     }
 
     override fun update(book: Book): Book? = transaction (database){
-        val updatedRows = BookTable.update({ BookTable.id eq book.id }) {
+        val nextVersion = book.version + 1
+        val updatedRows = BookTable.update({ (BookTable.id eq book.id) and (BookTable.version eq book.version) }) {
             it[title] = book.title
             it[authorId] = book.author.id
             it[category] = book.category.displayName
             it[quantity] = book.quantity
             it[publishedYear] = book.publishedYear
             it[edition] = book.edition
+            it[version] = nextVersion
         }
-        if (updatedRows == 0)  null else book
+        when {
+            updatedRows > 0 -> book.copy(version = nextVersion)
+            BookTable.selectAll().where { BookTable.id eq book.id }.empty() -> null
+            else -> throw ConcurrentUpdateException("Book", book.id)
+        }
     }
 
     override fun delete(id: Int): Boolean = transaction(database){
