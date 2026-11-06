@@ -3,6 +3,8 @@ requireAuth();
 let currentPage = 1;
 const pageSize = 10;
 let totalPages = 1;
+let me = null;
+let admin = false;
 
 function currentFilters() {
     return {
@@ -12,7 +14,14 @@ function currentFilters() {
     };
 }
 
+// ADMIN: paginated list of every account. USER: only their own row (from /auth/me) —
+// GET /users is admin-only on the server anyway.
 async function loadUsers() {
+    if (!admin) {
+        renderUsers([me]);
+        return;
+    }
+
     const response = await apiFetch("/users" + qs(currentFilters()));
     if (!response.ok) return;
 
@@ -30,47 +39,43 @@ function renderUsers(users) {
     tbody.innerHTML = "";
 
     if (users.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="3" class="empty">No users found.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="${admin ? 4 : 3}" class="empty">No users found.</td></tr>`;
         return;
     }
-
-    const me = currentUser();
 
     users.forEach(user => {
         const tr = document.createElement("tr");
         tr.innerHTML = `
             <td>${escapeHtml(user.name)}</td>
             <td>${escapeHtml(user.email)}</td>
+            ${admin ? `<td>${escapeHtml(user.role)}</td>` : ""}
             <td class="actions"></td>
         `;
-
-        const actionsCell = tr.querySelector(".actions");
-
-        const editBtn = document.createElement("button");
-        editBtn.type = "button";
-        editBtn.title = "Edit";
-        editBtn.textContent = "✏️";
-        editBtn.addEventListener("click", () => editUser(user));
-        actionsCell.appendChild(editBtn);
-
-        if (me && me.id === user.id) {
-            const passwordBtn = document.createElement("button");
-            passwordBtn.type = "button";
-            passwordBtn.title = "Change password";
-            passwordBtn.textContent = "🔑";
-            passwordBtn.addEventListener("click", () => openPasswordModal(user.id));
-            actionsCell.appendChild(passwordBtn);
-        } else {
-            const deleteBtn = document.createElement("button");
-            deleteBtn.type = "button";
-            deleteBtn.title = "Delete";
-            deleteBtn.textContent = "🗑️";
-            deleteBtn.addEventListener("click", () => deleteUser(user.id));
-            actionsCell.appendChild(deleteBtn);
-        }
-
+        tr.querySelector(".actions").append(...actionButtons(user));
         tbody.appendChild(tr);
     });
+}
+
+function button(title, text, onClick) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.title = title;
+    btn.textContent = text;
+    btn.addEventListener("click", onClick);
+    return btn;
+}
+
+function actionButtons(user) {
+    const isMe = me && me.id === user.id;
+    const buttons = [button("Edit", "✏️", () => editUser(user))];
+    // Password change is self-only on the server, admins included.
+    if (isMe) buttons.push(button("Change password", "🔑", () => openPasswordModal(user.id)));
+    if (admin) {
+        const target = user.role === "ADMIN" ? "USER" : "ADMIN";
+        buttons.push(button(`Make ${target}`, target === "ADMIN" ? "⬆️ Admin" : "⬇️ User", () => changeRole(user.id, target)));
+        if (!isMe) buttons.push(button("Delete", "🗑️", () => deleteUser(user.id)));
+    }
+    return buttons;
 }
 
 function changePage(delta) {
@@ -110,9 +115,20 @@ function closePasswordModal() {
     document.getElementById("passwordModal").classList.add("hidden");
 }
 
+// 409 = the last admin cannot be demoted; the server's message says so.
+async function changeRole(id, role) {
+    if (!confirm(`Change this account's role to ${role}?`)) return;
+    const response = await apiFetch(`/users/${id}/role`, { method: "PATCH", body: JSON.stringify({ role }) });
+    if (!response.ok) await alertFailure(response, "Error changing role.");
+    // Re-read our own role too: an admin may just have demoted themself.
+    await init();
+}
+
+// 409 = last admin, or the account has loans (returned ones included).
 async function deleteUser(id) {
     if (!confirm("Remove this user?")) return;
-    await apiFetch(`/users/${id}`, { method: "DELETE" });
+    const response = await apiFetch(`/users/${id}`, { method: "DELETE" });
+    if (!response.ok) await alertFailure(response, "Error deleting user.");
     loadUsers();
 }
 
@@ -129,7 +145,7 @@ document.getElementById("userForm").addEventListener("submit", async (e) => {
 
     if (response.ok) {
         closeModal();
-        loadUsers();
+        await init();
     } else {
         document.getElementById("userFormError").textContent = await response.text() || "Error saving user.";
     }
@@ -172,5 +188,14 @@ document.getElementById("passwordForm").addEventListener("submit", async (e) => 
     }
 });
 
-loadUsers();
+async function init() {
+    me = await refreshCurrentUser();
+    if (!me) return;
+    admin = isAdmin(me);
+    document.getElementById("usersToolbar").hidden = !admin;
+    document.getElementById("usersPagination").hidden = !admin;
+    document.getElementById("roleHeader").hidden = !admin;
+    await loadUsers();
+}
 
+init();

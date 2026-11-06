@@ -3,6 +3,7 @@ requireAuth();
 let currentPage = 1;
 const pageSize = 10;
 let totalPages = 1;
+let admin = false;
 
 function currentFilters() {
     return {
@@ -32,7 +33,7 @@ function renderBooks(books) {
     tbody.innerHTML = "";
 
     if (books.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" class="empty">No books found.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="${admin ? 7 : 6}" class="empty">No books found.</td></tr>`;
         return;
     }
 
@@ -45,26 +46,31 @@ function renderBooks(books) {
             <td>${book.quantity}</td>
             <td>${book.publishedYear ?? "—"}</td>
             <td>${book.edition ? escapeHtml(book.edition) : "—"}</td>
-            <td class="actions"></td>
         `;
-
-        const actionsCell = tr.querySelector(".actions");
-
-        const editBtn = document.createElement("button");
-        editBtn.type = "button";
-        editBtn.title = "Edit";
-        editBtn.textContent = "✏️";
-        editBtn.addEventListener("click", () => editBook(book));
-
-        const deleteBtn = document.createElement("button");
-        deleteBtn.type = "button";
-        deleteBtn.title = "Delete";
-        deleteBtn.textContent = "🗑️";
-        deleteBtn.addEventListener("click", () => deleteBook(book.id));
-
-        actionsCell.append(editBtn, deleteBtn);
+        if (admin) tr.appendChild(adminActions(book));
         tbody.appendChild(tr);
     });
+}
+
+// Edit (incl. the stock-change control inside the edit modal) and delete are ADMIN-only.
+function adminActions(book) {
+    const actionsCell = document.createElement("td");
+    actionsCell.className = "actions";
+
+    const editBtn = document.createElement("button");
+    editBtn.type = "button";
+    editBtn.title = "Edit";
+    editBtn.textContent = "✏️";
+    editBtn.addEventListener("click", () => editBook(book));
+
+    const deleteBtn = document.createElement("button");
+    deleteBtn.type = "button";
+    deleteBtn.title = "Delete";
+    deleteBtn.textContent = "🗑️";
+    deleteBtn.addEventListener("click", () => deleteBook(book.id));
+
+    actionsCell.append(editBtn, deleteBtn);
+    return actionsCell;
 }
 
 function changePage(delta) {
@@ -116,7 +122,8 @@ function closeModal() {
 
 async function deleteBook(id) {
     if (!confirm("Remove this book?")) return;
-    await apiFetch(`/books/${id}`, { method: "DELETE" });
+    const response = await apiFetch(`/books/${id}`, { method: "DELETE" });
+    if (!response.ok) await alertFailure(response, "Error deleting book.");
     loadBooks();
 }
 
@@ -178,5 +185,13 @@ document.getElementById("bookForm").addEventListener("submit", async (e) => {
     }
 });
 
-loadBooks();
+async function init() {
+    admin = isAdmin(await refreshCurrentUser());
+    document.getElementById("addBookBtn").hidden = !admin;
+    document.getElementById("actionsHeader").hidden = !admin;
+    loadBooks();
+}
+
+init();
+
 

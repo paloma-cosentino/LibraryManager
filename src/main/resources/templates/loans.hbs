@@ -2,7 +2,7 @@
 <h2>🔄 Loans</h2>
 
 <div class="toolbar">
-    <input type="text" id="filterBorrower" placeholder="Borrower name">
+    <input type="text" id="filterBorrower" placeholder="Borrower name" hidden>
     <label class="checkbox-label"><input type="checkbox" id="filterActive"> Active only</label>
     <button type="button" onclick="applyFilters()">Search</button>
     <button type="button" class="btn-primary" onclick="openCreateModal()">+ New Loan</button>
@@ -16,7 +16,7 @@
             <th>Borrowed At</th>
             <th>Due Date</th>
             <th>Status</th>
-            <th>Actions</th>
+            <th id="actionsHeader" hidden>Actions</th>
         </tr>
     </thead>
     <tbody id="loansBody">
@@ -36,6 +36,11 @@
         <form id="loanForm">
             <label for="bookId">Book</label>
             <select id="bookId" required></select>
+
+            <div id="borrowerGroup" hidden>
+                <label for="borrowerId">Borrower</label>
+                <select id="borrowerId"></select>
+            </div>
 
             <label for="daysToReturn">Days to Return</label>
             <input type="number" id="daysToReturn" value="14" required>

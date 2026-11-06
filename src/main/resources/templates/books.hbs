@@ -11,7 +11,7 @@
         {{/each}}
     </select>
     <button type="button" onclick="applyFilters()">Search</button>
-    <button type="button" class="btn-primary" onclick="openCreateModal()">+ Add Book</button>
+    <button type="button" id="addBookBtn" class="btn-primary" onclick="openCreateModal()" hidden>+ Add Book</button>
 </div>
 
 <table class="data-table">
@@ -23,7 +23,7 @@
             <th>Qty</th>
             <th>Year</th>
             <th>Edition</th>
-            <th>Actions</th>
+            <th id="actionsHeader" hidden>Actions</th>
         </tr>
     </thead>
     <tbody id="booksBody">

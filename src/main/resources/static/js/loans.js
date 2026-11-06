@@ -3,10 +3,13 @@ requireAuth();
 let currentPage = 1;
 const pageSize = 10;
 let totalPages = 1;
+let me = null;
+let admin = false;
 
 function currentFilters() {
     return {
-        borrower: document.getElementById("filterBorrower").value.trim(),
+        // USERs only ever receive their own loans; the name search is an ADMIN tool.
+        borrower: admin ? document.getElementById("filterBorrower").value.trim() : "",
         onlyActive: document.getElementById("filterActive").checked,
         page: currentPage,
         size: pageSize
@@ -40,7 +43,7 @@ function renderLoans(loans) {
     tbody.innerHTML = "";
 
     if (loans.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" class="empty">No loans found.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="${admin ? 6 : 5}" class="empty">No loans found.</td></tr>`;
         return;
     }
 
@@ -52,17 +55,21 @@ function renderLoans(loans) {
             <td>${loan.borrowedAt}</td>
             <td>${loan.dueDate}</td>
             <td>${statusBadge(loan)}</td>
-            <td class="actions"></td>
         `;
 
-        if (!loan.isReturned) {
-            const actionsCell = tr.querySelector(".actions");
-            const returnBtn = document.createElement("button");
-            returnBtn.type = "button";
-            returnBtn.title = "Mark as returned";
-            returnBtn.textContent = "↩️ Return";
-            returnBtn.addEventListener("click", () => returnLoan(loan.id));
-            actionsCell.appendChild(returnBtn);
+        // Returning is ADMIN-only.
+        if (admin) {
+            const actionsCell = document.createElement("td");
+            actionsCell.className = "actions";
+            if (!loan.isReturned) {
+                const returnBtn = document.createElement("button");
+                returnBtn.type = "button";
+                returnBtn.title = "Mark as returned";
+                returnBtn.textContent = "↩️ Return";
+                returnBtn.addEventListener("click", () => returnLoan(loan.id));
+                actionsCell.appendChild(returnBtn);
+            }
+            tr.appendChild(actionsCell);
         }
 
         tbody.appendChild(tr);
@@ -102,11 +109,33 @@ async function loadBookOptions() {
     });
 }
 
+// ADMIN only: accounts to borrow on behalf of, defaulting to the admin themself.
+async function loadBorrowerOptions() {
+    const select = document.getElementById("borrowerId");
+    select.innerHTML = `<option value="">Loading accounts…</option>`;
+
+    const response = await apiFetch("/users?size=100");
+    if (!response.ok) {
+        select.innerHTML = `<option value="">Could not load accounts</option>`;
+        return;
+    }
+
+    const result = await response.json();
+    select.innerHTML = "";
+    result.data.forEach(user => {
+        const option = document.createElement("option");
+        option.value = user.id;
+        option.textContent = `${user.name} (${user.email})`;
+        select.appendChild(option);
+    });
+    select.value = String(me.id);
+}
+
 async function openCreateModal() {
     document.getElementById("loanForm").reset();
     document.getElementById("loanFormError").textContent = "";
     document.getElementById("loanModal").classList.remove("hidden");
-    await loadBookOptions();
+    await Promise.all([loadBookOptions(), admin ? loadBorrowerOptions() : Promise.resolve()]);
 }
 
 function closeModal() {
@@ -115,7 +144,8 @@ function closeModal() {
 
 async function returnLoan(id) {
     if (!confirm("Mark this loan as returned?")) return;
-    await apiFetch(`/loans/${id}/return`, { method: "PATCH" });
+    const response = await apiFetch(`/loans/${id}/return`, { method: "PATCH" });
+    if (!response.ok) await alertFailure(response, "Error returning loan.");
     loadLoans();
 }
 
@@ -124,10 +154,12 @@ document.getElementById("loanForm").addEventListener("submit", async (e) => {
 
     const payload = {
         bookId: parseInt(document.getElementById("bookId").value, 10),
-        // Loans are booked to the signed-in account.
-        userId: currentUser().id,
         daysToReturn: parseInt(document.getElementById("daysToReturn").value, 10)
     };
+    // A USER sends no userId: the server always books it to the authenticated account.
+    if (admin && document.getElementById("borrowerId").value) {
+        payload.userId = parseInt(document.getElementById("borrowerId").value, 10);
+    }
 
     const response = await apiFetch("/loans", { method: "POST", body: JSON.stringify(payload) });
 
@@ -139,5 +171,14 @@ document.getElementById("loanForm").addEventListener("submit", async (e) => {
     }
 });
 
-loadLoans();
+async function init() {
+    me = await refreshCurrentUser();
+    admin = isAdmin(me);
+    document.getElementById("filterBorrower").hidden = !admin;
+    document.getElementById("actionsHeader").hidden = !admin;
+    document.getElementById("borrowerGroup").hidden = !admin;
+    loadLoans();
+}
+
+init();
 

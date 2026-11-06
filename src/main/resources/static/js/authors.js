@@ -3,6 +3,7 @@ requireAuth();
 let currentPage = 1;
 const pageSize = 10;
 let totalPages = 1;
+let admin = false;
 
 function currentFilters() {
     return {
@@ -30,34 +31,37 @@ function renderAuthors(authors) {
     tbody.innerHTML = "";
 
     if (authors.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="2" class="empty">No authors found.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="${admin ? 2 : 1}" class="empty">No authors found.</td></tr>`;
         return;
     }
 
     authors.forEach(author => {
         const tr = document.createElement("tr");
-        tr.innerHTML = `
-            <td>${escapeHtml(author.name)}</td>
-            <td class="actions"></td>
-        `;
-
-        const actionsCell = tr.querySelector(".actions");
-
-        const editBtn = document.createElement("button");
-        editBtn.type = "button";
-        editBtn.title = "Edit";
-        editBtn.textContent = "✏️";
-        editBtn.addEventListener("click", () => editAuthor(author));
-
-        const deleteBtn = document.createElement("button");
-        deleteBtn.type = "button";
-        deleteBtn.title = "Delete";
-        deleteBtn.textContent = "🗑️";
-        deleteBtn.addEventListener("click", () => deleteAuthor(author.id));
-
-        actionsCell.append(editBtn, deleteBtn);
+        tr.innerHTML = `<td>${escapeHtml(author.name)}</td>`;
+        if (admin) tr.appendChild(adminActions(author));
         tbody.appendChild(tr);
     });
+}
+
+// Edit and delete are ADMIN-only.
+function adminActions(author) {
+    const actionsCell = document.createElement("td");
+    actionsCell.className = "actions";
+
+    const editBtn = document.createElement("button");
+    editBtn.type = "button";
+    editBtn.title = "Edit";
+    editBtn.textContent = "✏️";
+    editBtn.addEventListener("click", () => editAuthor(author));
+
+    const deleteBtn = document.createElement("button");
+    deleteBtn.type = "button";
+    deleteBtn.title = "Delete";
+    deleteBtn.textContent = "🗑️";
+    deleteBtn.addEventListener("click", () => deleteAuthor(author.id));
+
+    actionsCell.append(editBtn, deleteBtn);
+    return actionsCell;
 }
 
 function changePage(delta) {
@@ -95,8 +99,8 @@ function closeModal() {
 async function deleteAuthor(id) {
     if (!confirm("Remove this author?")) return;
     const response = await apiFetch(`/authors/${id}`, { method: "DELETE" });
-    if (!response.ok && response.status !== 204) {
-        alert("Could not delete author (they may still have books linked to them).");
+    if (!response.ok) {
+        await alertFailure(response, "Could not delete author.");
         return;
     }
     loadAuthors();
@@ -120,5 +124,12 @@ document.getElementById("authorForm").addEventListener("submit", async (e) => {
     }
 });
 
-loadAuthors();
+async function init() {
+    admin = isAdmin(await refreshCurrentUser());
+    document.getElementById("addAuthorBtn").hidden = !admin;
+    document.getElementById("actionsHeader").hidden = !admin;
+    loadAuthors();
+}
+
+init();
 
