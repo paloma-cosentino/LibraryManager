@@ -1,6 +1,7 @@
 package org.example.http
 
 import org.example.model.AuthorExceptions
+import org.example.model.AuthorizationExceptions
 import org.example.model.BookExceptions
 import org.example.model.LoanExceptions
 import org.example.model.UserExceptions
@@ -8,6 +9,7 @@ import org.example.repository.ConcurrentUpdateException
 import org.http4k.core.Response
 import org.http4k.core.Status.Companion.BAD_REQUEST
 import org.http4k.core.Status.Companion.CONFLICT
+import org.http4k.core.Status.Companion.FORBIDDEN
 import org.http4k.core.Status.Companion.NOT_FOUND
 import org.http4k.core.Status.Companion.UNAUTHORIZED
 import org.http4k.lens.LensFailure
@@ -48,4 +50,8 @@ fun handleUserExceptions(block: () -> Response): Response = try {
 catch (e: UserExceptions.UserEmailNotFoundException)   { Response(NOT_FOUND).body(e.message!!) }
 catch (e: UserExceptions.DuplicateUserException)       { Response(CONFLICT).body(e.message!!) }
 catch (e: UserExceptions.InvalidCredentialsException) { Response(UNAUTHORIZED).body(e.message!!) }
+catch (e: AuthorizationExceptions.ForbiddenException) { forbidden(e) }
 catch (e: LensFailure)                                 { Response(BAD_REQUEST).body(e.message ?: "Invalid request body") }
+
+// Reusable by any handler group whose service enforces ownership.
+fun forbidden(e: AuthorizationExceptions.ForbiddenException) = Response(FORBIDDEN).body(e.message!!)

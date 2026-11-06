@@ -56,7 +56,7 @@ class UserHandler(private val service: IUserService) {
 
     val getByEmail: HttpHandler = { request ->
         handleUserExceptions {
-            val user = service.getUserByEmail(emailQuery(request))
+            val user = service.getUserByEmail(actorLens(request), emailQuery(request))
             userResponseLens(user.toResponse(), Response.Companion(Status.OK))
         }
     }
@@ -76,7 +76,7 @@ class UserHandler(private val service: IUserService) {
     val update: HttpHandler = { request ->
         handleUserExceptions {
             val body = updateUserRequestLens(request)
-            val updated = service.updateUserProfile(idPath(request), body.name, body.email)
+            val updated = service.updateUserProfile(actorLens(request), idPath(request), body.name, body.email)
             if (updated == null) Response.Companion(Status.NOT_FOUND)
             else userResponseLens(updated.toResponse(), Response.Companion(Status.OK))
         }
@@ -85,7 +85,7 @@ class UserHandler(private val service: IUserService) {
     val changePassword: HttpHandler = { request ->
         handleUserExceptions {
             val body = changePasswordRequestLens(request)
-            service.changePassword(idPath(request), body.currentPassword, body.newPassword)
+            service.changePassword(actorLens(request), idPath(request), body.currentPassword, body.newPassword)
             Response.Companion(Status.NO_CONTENT)
         }
     }
@@ -115,11 +115,11 @@ class UserHandler(private val service: IUserService) {
 
 fun userRoutes(handler: UserHandler) = routes(
     "/auth/me" bind GET to handler.me,
-    "/users" bind GET to handler.getAll,
+    "/users" bind GET to requireAdmin.then(handler.getAll),
     "/users/email" bind GET to handler.getByEmail,
     "/users/{id}" bind PUT to handler.update,
     "/users/{id}/password" bind PATCH to handler.changePassword,
-    "/users/{id}" bind DELETE to handler.delete,
+    "/users/{id}" bind DELETE to requireAdmin.then(handler.delete),
 )
 
 fun publicUserRoutes(handler: UserHandler) = routes(

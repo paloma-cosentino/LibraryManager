@@ -1,5 +1,6 @@
 package org.example.http
 
+import org.example.model.Actor
 import org.example.model.LoginResponse
 import org.example.model.PagedResult
 import org.example.model.Role
@@ -55,6 +56,8 @@ class UserHandlerTest {
 
     private fun authenticated(handler: HttpHandler) =
         ServerFilters.InitialiseRequestContext(requestContexts).then(authFilter(repository)).then(handler)
+
+    private fun asSelf(id: Int) = unauthenticatedApp.asActor(Actor(id, Role.USER))
 
     private fun postLogin(email: String, password: String) =
         authApp(
@@ -220,7 +223,7 @@ class UserHandlerTest {
     fun `PATCH users password returns 204 and allows login with the new password`() {
         val created = userResponseLens(postUser("Alice", "alice@example.com", "senha123"))
 
-        val changeResponse = app(
+        val changeResponse = asSelf(created.id)(
             Request(PATCH, "/users/${created.id}/password")
                 .header("Content-Type", "application/json")
                 .body("""{"currentPassword":"senha123","newPassword":"novaSenha456"}""")
@@ -234,7 +237,7 @@ class UserHandlerTest {
     fun `PATCH users password returns 401 when current password is wrong`() {
         val created = userResponseLens(postUser("Alice", "alice@example.com", "senha123"))
 
-        val response = app(
+        val response = asSelf(created.id)(
             Request(PATCH, "/users/${created.id}/password")
                 .header("Content-Type", "application/json")
                 .body("""{"currentPassword":"wrongPassword","newPassword":"novaSenha456"}""")
@@ -245,7 +248,7 @@ class UserHandlerTest {
 
     @Test
     fun `PATCH users password returns 404 when user does not exist`() {
-        val response = app(
+        val response = asSelf(999)(
             Request(PATCH, "/users/999/password")
                 .header("Content-Type", "application/json")
                 .body("""{"currentPassword":"whatever","newPassword":"novaSenha456"}""")

@@ -1,5 +1,7 @@
 package org.example.service
 
+import org.example.model.Actor
+import org.example.model.AuthorizationExceptions
 import org.example.model.LoginResponse
 import org.example.model.PagedResult
 import org.example.model.Role
@@ -20,9 +22,13 @@ class UserService(private val repository: UserRepository): IUserService {
         repository.findById(id)
         ?: throw UserExceptions.UserIdNotFoundException(id)
 
-    override fun getUserByEmail(email: String) =
-        repository.findByEmail(email)
-        ?: throw UserExceptions.UserEmailNotFoundException(email)
+    // A USER may only look up their own account; any other email is forbidden whether or not it
+    // exists, so the endpoint cannot be used to probe which emails are registered.
+    override fun getUserByEmail(actor: Actor, email: String): User {
+        val user = repository.findByEmail(email)
+        if (!actor.isAdmin && user?.id != actor.userId) throw AuthorizationExceptions.ForbiddenException()
+        return user ?: throw UserExceptions.UserEmailNotFoundException(email)
+    }
 
     override fun addUser(name: String, email: String, password: String): User {
         if (repository.findByEmail(email) != null) {
@@ -38,14 +44,22 @@ class UserService(private val repository: UserRepository): IUserService {
     // Used by the HTTP layer: never accepts/touches passwordHash, so clients
     // (and GET responses, which no longer expose the hash) don't need to
     // know it just to rename a user or change their email.
-    override fun updateUserProfile(id: Int, name: String, email: String): User? {
+    override fun updateUserProfile(actor: Actor, id: Int, name: String, email: String): User? {
+        requireSelfOrAdmin(actor, id)
         val current = repository.findById(id) ?: return null
         return repository.update(current.copy(name = name, email = email))
     }
 
+    // Checked before any lookup so a USER cannot learn whether another id exists.
+    private fun requireSelfOrAdmin(actor: Actor, id: Int) {
+        if (!actor.isAdmin && actor.userId != id) throw AuthorizationExceptions.ForbiddenException()
+    }
+
     // Self-service password change: requires proving the current password,
     // since this is reachable by any authenticated user for their own id.
-    override fun changePassword(id: Int, currentPassword: String, newPassword: String) {
+    override fun changePassword(actor: Actor, id: Int, currentPassword: String, newPassword: String) {
+        // Own account only, admins included: admins manage profiles, never other people's credentials.
+        if (actor.userId != id) throw AuthorizationExceptions.ForbiddenException()
         val current = repository.findById(id)
             ?: throw UserExceptions.UserIdNotFoundException(id)
 

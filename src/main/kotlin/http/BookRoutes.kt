@@ -16,6 +16,7 @@ import org.http4k.core.Status.Companion.BAD_REQUEST
 import org.http4k.core.Status.Companion.NOT_FOUND
 import org.http4k.core.Status.Companion.NO_CONTENT
 import org.http4k.core.Status.Companion.OK
+import org.http4k.core.then
 import org.http4k.format.Jackson.auto
 import org.http4k.lens.Path
 import org.http4k.lens.Query
@@ -25,11 +26,11 @@ import org.http4k.routing.routes
 
 fun bookRoutes(handler: BookHandler) = routes(
     "/books"      bind GET    to handler.getAll,
-    "/books"      bind POST   to handler.create,
+    "/books"      bind POST   to requireAdmin.then(handler.create),
     "/books/{id}" bind GET    to handler.getById,
-    "/books/{id}" bind PUT    to handler.update,
-    "/books/{id}/quantity" bind PATCH to handler.adjustQuantity,
-    "/books/{id}" bind DELETE to handler.delete
+    "/books/{id}" bind PUT    to requireAdmin.then(handler.update),
+    "/books/{id}/quantity" bind PATCH to requireAdmin.then(handler.adjustQuantity),
+    "/books/{id}" bind DELETE to requireAdmin.then(handler.delete)
 )
 
 class BookHandler(private val service: IBookService) {
